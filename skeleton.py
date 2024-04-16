@@ -5,7 +5,9 @@ class IMEM(object):
     def __init__(self, iodir):
         self.size = pow(2, 16) # Can hold a maximum of 2^16 instructions.
         self.filepath = os.path.abspath(os.path.join(iodir, "Code.asm"))
+        self.opfilepath = os.path.abspath(os.path.join(iodir, "CodeOP.asm"))
         self.instructions = []
+        self.unrolled_instructions = []
 
         try:
             with open(self.filepath, 'r') as insf:
@@ -32,6 +34,15 @@ class IMEM(object):
 
         else:
             print("IMEM - ERROR: Invalid memory access at index: ", idx, " with memory size: ", self.size)
+
+    def Dump(self):
+        try:
+            with open(self.opfilepath, 'w') as opf:
+                lines = [str(unroll_instr) + '\n' for unroll_instr in self.unrolled_instructions]
+                opf.writelines(lines)
+            print("Dumped unrolled instructions into output file in path:", self.opfilepath)
+        except:
+            print("ERROR: Couldn't dump unrolled instructions output file in path:", self.opfilepath)
 
 class DMEM(object):
     # Word addressible - each address contains 32 bits.
@@ -169,10 +180,6 @@ class Core():
     Returns 0 if operation is successful, else returns -1
     """
 
-    # Vector Operations
-    # TO DO: 
-    # 1) Add masks to all the operations
-
     def execute_ADDVV(self,instr_list): 
         
         # Load Vector Registers into the functions
@@ -182,6 +189,7 @@ class Core():
             VR3 = self.RFs["VRF"].Read(int(instr_list[3][2:]))
             VLR = self.RFs["VLR"].Read(0)[0]
             VMR = self.RFs["VMR"].Read(0)
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -200,6 +208,7 @@ class Core():
             VR2 = self.RFs["VRF"].Read(int(instr_list[3][2:]))
             VLR = self.RFs["VLR"].Read(0)[0]
             VMR = self.RFs["VMR"].Read(0)
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -218,6 +227,7 @@ class Core():
             SR1 = self.RFs["SRF"].Read(int(instr_list[3][2:]))[0]
             VLR = self.RFs["VLR"].Read(0)[0]
             VMR = self.RFs["VMR"].Read(0)
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -235,6 +245,7 @@ class Core():
             SR1 = self.RFs["SRF"].Read(int(instr_list[3][2:]))[0]
             VLR = self.RFs["VLR"].Read(0)[0]
             VMR = self.RFs["VMR"].Read(0)
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -252,6 +263,7 @@ class Core():
             VR3 = self.RFs["VRF"].Read(int(instr_list[3][2:]))
             VLR = self.RFs["VLR"].Read(0)[0]
             VMR = self.RFs["VMR"].Read(0)
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -269,6 +281,7 @@ class Core():
             VR3 = self.RFs["VRF"].Read(int(instr_list[3][2:]))
             VLR = self.RFs["VLR"].Read(0)[0]
             VMR = self.RFs["VMR"].Read(0)
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -290,6 +303,7 @@ class Core():
             SR1 = self.RFs["SRF"].Read(int(instr_list[3][2:]))[0]
             VLR = self.RFs["VLR"].Read(0)[0]
             VMR = self.RFs["VMR"].Read(0)
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -307,6 +321,7 @@ class Core():
             SR1 = self.RFs["SRF"].Read(int(instr_list[3][2:]))[0]
             VLR = self.RFs["VLR"].Read(0)[0]
             VMR = self.RFs["VMR"].Read(0)
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -619,11 +634,16 @@ class Core():
         except:
             print("Error while loading values from register")
             return -1
-        
+        op_str = "("
         for i in range(VLR): 
-            if VMR[i] == 1: VR1[i] = self.VDMEM.Read(SR1+i)
+            if VMR[i] == 1: 
+                VR1[i] = self.VDMEM.Read(SR1+i)
+                op_str += str(i)
+                op_str +=", "
+        op_str= op_str[:-2] + ")"
         
         self.RFs["VRF"].Write(int(instr_list[1][2:]),VR1)
+        self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+op_str)
         return 0
 
     def execute_SV(self,instr_list): 
@@ -637,8 +657,14 @@ class Core():
             print("Error while loading values from register")
             return -1
         
+        op_str = "("       
         for i in range(VLR):
-            if VMR[i] == 1: self.VDMEM.Write(SR1 + i, VR1[i])
+            if VMR[i] == 1: 
+                self.VDMEM.Write(SR1 + i, VR1[i])
+                op_str += str(i)
+                op_str +=", "
+        op_str= op_str[:-2] + ")"
+        self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+op_str) 
         return 0
 
     def execute_LVI(self,instr_list): 
@@ -737,6 +763,7 @@ class Core():
         try:
             SR1 = self.RFs["SRF"].Read(int(instr_list[2][2:]))[0]
             SR2 = self.RFs["SRF"].Read(int(instr_list[3][2:]))[0]
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -750,6 +777,7 @@ class Core():
         try:
             SR1 = self.RFs["SRF"].Read(int(instr_list[2][2:]))[0]
             SR2 = self.RFs["SRF"].Read(int(instr_list[3][2:]))[0]
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -763,6 +791,7 @@ class Core():
         try:
             SR1 = self.RFs["SRF"].Read(int(instr_list[2][2:]))[0]
             SR2 = self.RFs["SRF"].Read(int(instr_list[3][2:]))[0]
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -776,6 +805,7 @@ class Core():
         try:
             SR1 = self.RFs["SRF"].Read(int(instr_list[2][2:]))[0]
             SR2 = self.RFs["SRF"].Read(int(instr_list[3][2:]))[0]
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -789,6 +819,7 @@ class Core():
         try:
             SR1 = self.RFs["SRF"].Read(int(instr_list[2][2:]))[0]
             SR2 = self.RFs["SRF"].Read(int(instr_list[3][2:]))[0]
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -802,6 +833,7 @@ class Core():
         try:
             SR1 = self.RFs["SRF"].Read(int(instr_list[2][2:]))[0]
             SR2 = self.RFs["SRF"].Read(int(instr_list[3][2:]))[0]
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -818,6 +850,7 @@ class Core():
         try:
             SR1 = self.RFs["SRF"].Read(int(instr_list[2][2:]))[0]
             SR2 = self.RFs["SRF"].Read(int(instr_list[3][2:]))[0]
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -835,6 +868,7 @@ class Core():
         try:
             SR1 = self.RFs["SRF"].Read(int(instr_list[2][2:]))[0]
             SR2 = self.RFs["SRF"].Read(int(instr_list[3][2:]))[0]
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -964,6 +998,7 @@ class Core():
             VR2 = self.RFs["VRF"].Read(int(instr_list[2][2:]))
             VR3 = self.RFs["VRF"].Read(int(instr_list[3][2:]))
             VLR = self.RFs["VLR"].Read(0)[0]
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -982,6 +1017,7 @@ class Core():
             VR2 = self.RFs["VRF"].Read(int(instr_list[2][2:]))
             VR3 = self.RFs["VRF"].Read(int(instr_list[3][2:]))
             VLR = self.RFs["VLR"].Read(0)[0]
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -1000,6 +1036,7 @@ class Core():
             VR2 = self.RFs["VRF"].Read(int(instr_list[2][2:]))
             VR3 = self.RFs["VRF"].Read(int(instr_list[3][2:]))
             VLR = self.RFs["VLR"].Read(0)[0]
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -1017,6 +1054,7 @@ class Core():
             VR2 = self.RFs["VRF"].Read(int(instr_list[2][2:]))
             VR3 = self.RFs["VRF"].Read(int(instr_list[3][2:]))
             VLR = self.RFs["VLR"].Read(0)[0]
+            self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+instr_list[2]+" "+instr_list[3])
         except: 
             print("Error while loading values from register")
             return -1
@@ -1152,7 +1190,8 @@ if __name__ == "__main__":
     # Run Core
     vcore.run()   
     vcore.dumpregs(iodir)
-
+    
+    imem.Dump()
     sdmem.dump()
     vdmem.dump()
 
