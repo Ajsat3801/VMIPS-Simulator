@@ -583,6 +583,7 @@ class Core():
     def execute_CVM(self): 
         try:
             self.RFs["VMR"].Write(0, [1] * 64)
+            self.IMEM.unrolled_instructions.append("CVM")
             return 0
         except: return -1
     
@@ -594,6 +595,7 @@ class Core():
                 if VMR[i] == 1: SR1 += 1
             
             self.RFs["SRF"].Write(int(instr_list[1][2:]), [SR1])
+            self.IMEM.unrolled_instructions.append("POP")
             
             return 0
         except: return -1
@@ -606,7 +608,7 @@ class Core():
         except: return -1
         if SR1<=0:
             print("VLR cannot be negative or zero")
-            print(SR1)
+            print("SR1:",SR1)
             return -1
         
         if SR1>64:
@@ -638,7 +640,7 @@ class Core():
         for i in range(VLR): 
             if VMR[i] == 1: 
                 VR1[i] = self.VDMEM.Read(SR1+i)
-                op_str += str(i)
+                op_str += str(SR1+i)
                 op_str +=", "
         op_str= op_str[:-2] + ")"
         
@@ -661,7 +663,7 @@ class Core():
         for i in range(VLR):
             if VMR[i] == 1: 
                 self.VDMEM.Write(SR1 + i, VR1[i])
-                op_str += str(i)
+                op_str += str(SR1+i)
                 op_str +=", "
         op_str= op_str[:-2] + ")"
         self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+op_str) 
@@ -678,10 +680,16 @@ class Core():
             print("Error while loading values from register")
             return -1
         
+        op_str = "("
         for i in range(VLR):
-            if VMR[i] == 1: VR1[i] = self.VDMEM.Read(SR1 + VR2[i])
+            if VMR[i] == 1:
+                VR1[i] = self.VDMEM.Read(SR1 + VR2[i])
+                op_str += str(SR1 + VR2[i])
+                op_str +=", "
+        op_str= op_str[:-2] + ")"
         
         self.RFs["VRF"].Write(int(instr_list[1][2:]),VR1)
+        self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+op_str) 
         
         return 0
 
@@ -695,9 +703,16 @@ class Core():
         except:
             print("Error while loading values from register")
             return -1
-
+        
+        op_str = "("
         for i in range(VLR): 
-            if VMR[i] == 1: self.VDMEM.Write(SR1 + VR2[i], VR1[i])
+            if VMR[i] == 1: 
+                self.VDMEM.Write(SR1 + VR2[i], VR1[i])
+                op_str += str(SR1 + VR2[i])
+                op_str +=", "
+        op_str= op_str[:-2] + ")"
+
+        self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+op_str) 
         return 0
 
     def execute_LVWS(self,instr_list): 
@@ -711,10 +726,16 @@ class Core():
             print("Error while loading values from register")
             return -1
         
+        op_str = "("
         for i in range(VLR):
-            if VMR[i] == 1: VR1[i] = self.VDMEM.Read(SR1+(SR2*i))
+            if VMR[i] == 1:
+                VR1[i] = self.VDMEM.Read(SR1 + (SR2 * i))
+                op_str += str(SR1 + (SR2 * i))
+                op_str +=", "
+        op_str= op_str[:-2] + ")"
         
         self.RFs["VRF"].Write(int(instr_list[1][2:]),VR1)
+        self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+op_str) 
         
         return 0
 
@@ -729,8 +750,14 @@ class Core():
             print("Error while loading values from register")
             return -1
 
+        op_str = "("
         for i in range(VLR): 
-            if VMR[i] == 1: self.VDMEM.Write(SR1 + (SR2 * i), VR1[i])
+            if VMR[i] == 1:
+                self.VDMEM.Write(SR1 + (SR2 * i), VR1[i])
+                op_str += str(SR1 + (SR2 * i))
+                op_str +=", "
+        op_str= op_str[:-2] + ")"
+        self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+op_str) 
         return 0
 
     def execute_LS(self,instr_list): 
@@ -742,6 +769,7 @@ class Core():
             return -1
         
         SR2 = self.SDMEM.Read(SR1+IMM)
+        self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" ("+str(SR1+IMM)+")")
         self.RFs["SRF"].Write(int(instr_list[1][2:]),[SR2])
         return 0
 
@@ -755,6 +783,7 @@ class Core():
             return -1
 
         self.SDMEM.Write(SR1 + IMM, SR2)
+        self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" ("+str(SR1+IMM)+")")
         return
 
     # Scalar Operations
@@ -898,6 +927,7 @@ class Core():
         if SR1 == SR2:
             self.PC += IMM
         
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC+1)+")")
         return 0
 
     def execute_BNE(self,instr_list):
@@ -916,6 +946,7 @@ class Core():
         if SR1 != SR2:
             self.PC += IMM
         
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC+1)+")")
         return 0
         
     def execute_BGT(self,instr_list): 
@@ -934,6 +965,7 @@ class Core():
         if SR1 > SR2:
             self.PC += IMM
         
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC+1)+")")
         return 0
         
     def execute_BLT(self,instr_list): 
@@ -952,6 +984,7 @@ class Core():
         if SR1 < SR2:
             self.PC += IMM
         
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC+1)+")")
         return 0
         
     def execute_BGE(self,instr_list): 
@@ -970,6 +1003,7 @@ class Core():
         if SR1 >= SR2:
             self.PC += IMM
         
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC+1)+")")
         return 0
         
     def execute_BLE(self,instr_list): 
@@ -988,6 +1022,7 @@ class Core():
         if SR1 <= SR2:
             self.PC += IMM
         
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC+1)+")")
         return 0
 
     # Register - Register shuffle
@@ -1136,7 +1171,7 @@ class Core():
 
 
         if ex_status == -1:
-            print(instr_list)
+            print("instruction:",instr_list)
             print("Error in executing statement")
             return -1
 
@@ -1151,7 +1186,9 @@ class Core():
             instr_list = self.IMEM.Read(self.PC)
 
             if instr_list:
-                if instr_list[0] == "HALT": break
+                if instr_list[0] == "HALT": 
+                    self.IMEM.unrolled_instructions.append("HALT")
+                    break
                 else: 
                     ex_status = self.instruction_decode(instr_list)
                     if ex_status == -1: 
