@@ -8,7 +8,7 @@ class Config(object):
 
         try:
             with open(self.filepath, 'r') as conf:
-                self.parameters = {line.split('=')[0].strip(): line.split('=')[1].split('#')[0].strip() for line in conf.readlines() if not (line.startswith('#') or line.strip() == '')}
+                self.parameters = {line.split('=')[0].strip(): int(line.split('=')[1].split('#')[0].strip()) for line in conf.readlines() if not (line.startswith('#') or line.strip() == '')}
             print("Config - Parameters loaded from file:", self.filepath)
             print("Config parameters:", self.parameters)
         except:
@@ -18,7 +18,7 @@ class Config(object):
 class IMEM(object):
     def __init__(self, iodir):
         self.size = pow(2, 16) # Can hold a maximum of 2^16 instructions.
-        self.filepath = os.path.abspath(os.path.join(iodir, "Code.asm"))
+        self.filepath = os.path.abspath(os.path.join(iodir, "CodeOP.asm"))
         self.instructions = []
 
         try:
@@ -103,15 +103,26 @@ class RegisterFile(object):
             raise
 
 class instruction():
-    def __init__(self,instr_name,instr_type,s_regs,v_regs,smem_ad,vmem_ad):
-    
+    def __init__(self,instr_name,instr_queue,s_regs,v_regs,smem_ad,vmem_ad,instr_cycleCount):
+        # Each instruction after decoding will contain the following metadata
         self.instr_name = instr_name
-        self.instr_type = instr_type # number indicating which function to go to
-        self.s_regs = s_regs # list of all scalar registers used
-        self.v_regs = v_regs # likewise for vector registers
-        self.smem_ad = smem_ad # list of all scalar memory addresses used
-        self.vmem_ad = vmem_ad # likewise for vector memory addresses
-
+        self.instr_queue = instr_queue              # number indicating which queue to enter
+                                                    # 0: VectorCompute Queue; 1: VectorData Queue; 2: ScalarOps Queue
+        self.s_regs = s_regs                        # list of all scalar registers used
+        self.v_regs = v_regs                        # likewise for vector registers
+        self.smem_ad = smem_ad                      # list of all scalar memory addresses used
+        self.vmem_ad = vmem_ad                      # likewise for vector memory addresses
+        self.instr_cycleCount = instr_cycleCount    # Number of cycles instruction takes
+    
+    def __init__(self):
+        # Constructor with default values
+        self.instr_name = ""
+        self.instr_queue = -1
+        self.s_regs = []
+        self.v_regs = []
+        self.smem_ad = []
+        self.vmem_ad = []
+        self.instr_cycleCount = 0
 class Core():
     def __init__(self, imem, sdmem, vdmem, config):
         self.IMEM = imem
@@ -127,13 +138,11 @@ class Core():
                     "VLR": RegisterFile("VLR", 1)
                 }  
         
-        self.busyBoard = {"scalar": [0]*8,
-                          "vector": [0]*8
-                          }
-        
-        self.queues = {"vectorData":[0]*self.config.parameters["dataQueueDepth"],
-                       "vectorCompute":[0]*self.config.parameters["computeQueueDepth"],
-                       "scalar":[0]*self.config.parameters["computeQueueDepth"],
+        self.busyBoard = {"scalar": [0]*8,"vector": [0]*8}
+        print(self.config.parameters)
+        self.queues = {"vectorCompute":[None]*self.config.parameters["computeQueueDepth"],
+                       "vectorData":[None]*self.config.parameters["dataQueueDepth"],
+                       "scalarOps":[None]*self.config.parameters["computeQueueDepth"],
                        }
         
         self.fetched_instr_current = []
@@ -148,11 +157,38 @@ class Core():
 
         # Decode functions here 
     
-    def decode(instr_list):
+    def decode(self,instr_list):
         # convert instuction list to instruction format
-        return
+        # creating instruction object and loading default values
+        ins = instruction()
+        ins.instr_name = instr_list[0]
+
+        if(ins.instr_name in ["ADDVV","SUBVV","MULVV","DIVVV","UNPACKLO","UNPACKHI","PACKLO","PACKHI"]):
+            ins.instr_queue = 0
+            ins.v_regs = [int(instr_list[1][2:]),int(instr_list[2][2:]),int(instr_list[3][2:])]
+            print(ins.instr_name,ins.v_regs)
+
+        elif(ins.instr_name in ["ADDVS","SUBVS","MULVS","DIVVS"]):
+            ins.instr_queue = 0
+            ins.v_regs = [int(instr_list[1][2:]),int(instr_list[2][2:])]
+            ins.s_regs = [int(instr_list[3][2:])]
+        
+        elif(ins.instr_name in ["POP","MTCL","MFCL"]):
+            ins.instr_queue = 2
+            ins.s_regs = [int(instr_list[1][2:])]
+
+        elif(ins.instr_name == "B"):
+            # Dunno what to in branch
+            # It goes to the scalar queue??
+            continue
+
+        else: 
+            print("UNKNOWN INSTRUCTION")
+            return -1
+        
+        return instruction
     
-    def dispatch(instruction):
+    def dispatch(self,instruction):
         # checks busy board and sends instructions to the queues if free
         return
        
@@ -167,7 +203,13 @@ class Core():
 
             # Decode phase
             self.decoded_instr_prev = self.decoded_instr_current
-            self.decoded_instr_current = self.decode(self.fetched_instr_prev)
+
+            # Confirm what to do when we have blank.....
+            if(len(self.fetched_instr_prev)>0): 
+                self.decoded_instr_current = self.decode(self.fetched_instr_prev)
+                if self.decoded_instr_current == -1:
+                    print("ERROR OCURRED WHILE DECODING")
+                    return -1
 
             # Dispatch phase
             self.dispatch(self.decoded_instr_prev)
