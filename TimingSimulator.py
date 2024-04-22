@@ -103,13 +103,13 @@ class RegisterFile(object):
             raise
 
 class instruction():
-    def __init__(self,instr_name,instr_queue,s_regs,v_regs,smem_ad,vmem_ad,instr_cycleCount):
+    def __init__(self,instr_name,instr_queue,src_regs,dst_regs,smem_ad,vmem_ad,instr_cycleCount):
         # Each instruction after decoding will contain the following metadata
         self.instr_name = instr_name
         self.instr_queue = instr_queue              # number indicating which queue to enter
                                                     # 0: VectorCompute Queue; 1: VectorData Queue; 2: ScalarOps Queue
-        self.s_regs = s_regs                        # list of all scalar registers used
-        self.v_regs = v_regs                        # likewise for vector registers
+        self.src_regs = src_regs                    # list of all scalar registers used
+        self.dst_regs = dst_regs                    # likewise for vector registers
         self.smem_ad = smem_ad                      # list of all scalar memory addresses used
         self.vmem_ad = vmem_ad                      # likewise for vector memory addresses
         self.instr_cycleCount = instr_cycleCount    # Number of cycles instruction takes
@@ -118,11 +118,12 @@ class instruction():
         # Constructor with default values
         self.instr_name = ""
         self.instr_queue = -1
-        self.s_regs = []
-        self.v_regs = []
+        self.src_regs = {"Scalar":[],"Vector":[]}
+        self.dst_regs = {"Scalar":[],"Vector":[]}
         self.smem_ad = []
         self.vmem_ad = []
         self.instr_cycleCount = 0
+
 class Core():
     def __init__(self, imem, sdmem, vdmem, config):
         self.IMEM = imem
@@ -140,6 +141,7 @@ class Core():
         
         self.busyBoard = {"scalar": [0]*8,"vector": [0]*8}
         print(self.config.parameters)
+
         self.queues = {"vectorCompute":[None]*self.config.parameters["computeQueueDepth"],
                        "vectorData":[None]*self.config.parameters["dataQueueDepth"],
                        "scalarOps":[None]*self.config.parameters["computeQueueDepth"],
@@ -150,6 +152,12 @@ class Core():
         
         self.decoded_instr_current = instruction()
         self.decoded_instr_prev = instruction()
+
+        self.nop = {"Fetch":False,
+                      "Decode":True,
+                      "SendToCompute":True}
+        
+        self.stall_frontend = False
         
         # Your code here.
 
@@ -162,25 +170,43 @@ class Core():
         # creating instruction object and loading default values
         ins = instruction()
         ins.instr_name = instr_list[0]
+        print(instr_list)
 
         if(ins.instr_name in ["ADDVV","SUBVV","MULVV","DIVVV","UNPACKLO","UNPACKHI","PACKLO","PACKHI"]):
             ins.instr_queue = 0
-            ins.v_regs = [int(instr_list[1][2:]),int(instr_list[2][2:]),int(instr_list[3][2:])]
-            print(ins.instr_name,ins.v_regs)
+            ins.src_regs["Vector"] = [int(instr_list[2][2:]),int(instr_list[3][2:])]
+            ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
 
         elif(ins.instr_name in ["ADDVS","SUBVS","MULVS","DIVVS"]):
             ins.instr_queue = 0
-            ins.v_regs = [int(instr_list[1][2:]),int(instr_list[2][2:])]
-            ins.s_regs = [int(instr_list[3][2:])]
-        
+            ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
+            ins.src_regs["Vector"] = [int(instr_list[2][2:])]
+            ins.src_regs["Scalar"] = [int(instr_list[3][2:])]
+            
         elif(ins.instr_name in ["POP","MTCL","MFCL"]):
             ins.instr_queue = 2
             ins.s_regs = [int(instr_list[1][2:])]
 
+        elif(ins.instr_name in ["LV",'SV',"LVI",'SVI',"LVWS",'SVWS']):
+            ins.instr_queue = 1
+            ins.dst_regs["Vector"] = [instr_list[1][2:]]
+            ins.vmem_ad = instr_list[2][1:-1].split(",")
+
+        elif(ins.instr_name in ["LS","SS"]):
+            ins.instr_queue = 2
+            ins.dst_regs["Scalar"] = [instr_list[1][2:]]
+            ins.smem_ad = instr_list[2][1:-1].split(",")
+
+        elif(ins.instr_name in ["ADD","SUB","AND","OR","XOR","SLL","SRL","SRA"]):
+            ins.instr_queue = 2
+            ins.dst_regs["Scalar"] = [instr_list[1][2:]]
+            ins.src_regs["Scalar"] = [instr_list[2][2:],instr_list[3][2:]]
+        
+        elif(ins.instr_name in ["CVM"]):
+            ins.instr_queue = 2 # confirm if this is correct
+
         elif(ins.instr_name == "B"):
-            # Dunno what to in branch
-            # It goes to the scalar queue??
-            continue
+            ins.instr_queue = 2 # again confirm if correct
 
         else: 
             print("UNKNOWN INSTRUCTION")
@@ -188,34 +214,39 @@ class Core():
         
         return instruction
     
-    def dispatch(self,instruction):
-        # checks busy board and sends instructions to the queues if free
+    def sendToQueue(self,instruction):
+        #append to queues
+        return
+    
+    def CheckQueue(self,instruction):
+        # checks busyboard and if queues are full
         return
        
         
     def run(self):
-        self.PC = 0
+        self.PC = 4
         self.CycleCount = 0
+
         while(True):
-            # instruction fetch phase
-            self.fetched_instr_prev = self.fetched_instr_current
-            self.fetched_instr_current = self.IMEM.Read(self.PC)
+            # Send to Compute
+            if not self.nop["SendToCompute"] and not self.stall_frontend:
+                self.instr_op = self.sendToCompute(self.instrToBeCompute)
 
-            # Decode phase
-            self.decoded_instr_prev = self.decoded_instr_current
+            # Decode and SendToQueue
 
-            # Confirm what to do when we have blank.....
-            if(len(self.fetched_instr_prev)>0): 
-                self.decoded_instr_current = self.decode(self.fetched_instr_prev)
-                if self.decoded_instr_current == -1:
-                    print("ERROR OCURRED WHILE DECODING")
-                    return -1
+            if not self.nop["Decode"] and not self.stall_frontend:
+                self.instrToBeQueued = self.decode(self.decode_input)
+                addToQueue = self.CheckQueue(self.instrToBeQueued) # checks busyboard and if queues are full
+                if addToQueue:
+                    self.sendToQueue(self.instrToBeQueuedToQueue)
+                else: # set NOPS
+                    self.nop["Fetch"] = True
 
-            # Dispatch phase
-            self.dispatch(self.decoded_instr_prev)
-            
+            # Fetch
 
-            self.PC = self.PC + 1
+            if not self.nop["Fetch"] and not self.stall_frontend:
+                self.decode_input = self.IMEM.Read(self.PC)
+                self.PC = self.PC + 1
 
     def dumpregs(self, iodir):
         for rf in self.RFs.values():
@@ -249,5 +280,7 @@ if __name__ == "__main__":
 
     sdmem.dump()
     vdmem.dump()
+
+    print("END")
 
     # THE END
