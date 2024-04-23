@@ -35,6 +35,7 @@ class IMEM(object):
             return self.instructions[idx].split()
         else:
             print("IMEM - ERROR: Invalid memory access at index: ", idx, " with memory size: ", self.size)
+            return -1
 
 class DMEM(object):
     # Word addressible - each address contains 32 bits.
@@ -142,16 +143,18 @@ class Core():
         self.busyBoard = {"scalar": [0]*8,"vector": [0]*8}
         print(self.config.parameters)
 
-        self.queues = {"vectorCompute":[None]*self.config.parameters["computeQueueDepth"],
-                       "vectorData":[None]*self.config.parameters["dataQueueDepth"],
-                       "scalarOps":[None]*self.config.parameters["computeQueueDepth"],
+        self.queues = {"vectorCompute":[],
+                       "vectorData":[],
+                       "scalarOps":[]
                        }
         
         self.fetched_instr_current = []
         self.fetched_instr_prev = []
         
-        self.decoded_instr_current = instruction()
-        self.decoded_instr_prev = instruction()
+        self.instrToBeQueued = instruction()
+        self.instrToBeCompute = instruction()
+        self.decode_input = []
+        
 
         self.nop = {"Fetch":False,
                       "Decode":True,
@@ -170,7 +173,6 @@ class Core():
         # creating instruction object and loading default values
         ins = instruction()
         ins.instr_name = instr_list[0]
-        print(instr_list)
 
         if(ins.instr_name in ["ADDVV","SUBVV","MULVV","DIVVV","UNPACKLO","UNPACKHI","PACKLO","PACKHI"]):
             ins.instr_queue = 0
@@ -208,18 +210,39 @@ class Core():
         elif(ins.instr_name == "B"):
             ins.instr_queue = 2 # again confirm if correct
 
+        elif(ins.instr_name in ["SEQVV","SNEVV","SGTVV","SLTVV","SGEVV","SLEVV"]):
+            ins.instr_queue = 0
+            ins.src_regs["Vector"] = [instr_list[1][2:],instr_list[2][2:]]
+
+        elif(ins.instr_name in ["SEQVS","SNEVS","SGTVS","SLTVS","SGEVS","SLEVS"]):
+            ins.instr_queue = 0
+            ins.src_regs["Vector"] = [instr_list[1][2:]]
+            ins.src_regs["Scalar"] = [instr_list[2][2:]]
+
         else: 
             print("UNKNOWN INSTRUCTION")
             return -1
         
-        return instruction
+        return ins
     
-    def sendToQueue(self,instruction):
-        #append to queues
+    def CheckQueue(self,ins):
+        # checks busyboard and if queues are full
         return
     
-    def CheckQueue(self,instruction):
-        # checks busyboard and if queues are full
+    def sendToQueue(self,ins):
+        #append to queues
+        if(ins.instr_queue == 0):
+            if(len(self.queues["vectorCompute"])<self.config.parameters["computeQueueDepth"]):
+                self.queues["vectorCompute"].append(ins)
+            else: return -1
+        elif(ins.instr_queue == 1):
+            if(len(self.queues["vectorData"])<self.config.parameters["dataQueueDepth"]):
+                self.queues["vectorData"].append(ins)
+            else: return -1
+        elif(ins.instr_queue == 2):
+            if(len(self.queues["scalarOps"])<self.config.parameters["computeQueueDepth"]):
+                self.queues["scalarOps"].append(ins)
+            else: return -1
         return
        
         
@@ -229,23 +252,27 @@ class Core():
 
         while(True):
             # Send to Compute
-            if not self.nop["SendToCompute"] and not self.stall_frontend:
-                self.instr_op = self.sendToCompute(self.instrToBeCompute)
+            #self.instr_op = self.sendToCompute(self.instrToBeCompute)
 
             # Decode and SendToQueue
-
-            if not self.nop["Decode"] and not self.stall_frontend:
+            if len(self.decode_input)>0:
                 self.instrToBeQueued = self.decode(self.decode_input)
-                addToQueue = self.CheckQueue(self.instrToBeQueued) # checks busyboard and if queues are full
+                if self.instrToBeQueued == -1: break
+                #addToQueue = self.CheckQueue(self.instrToBeQueued) # checks busyboard and if queues are full
+                addToQueue = True
+
                 if addToQueue:
-                    self.sendToQueue(self.instrToBeQueuedToQueue)
+                    
+                    self.sendToQueue(self.instrToBeQueued)
                 else: # set NOPS
                     self.nop["Fetch"] = True
 
             # Fetch
 
-            if not self.nop["Fetch"] and not self.stall_frontend:
+            if not self.nop["Fetch"]:
                 self.decode_input = self.IMEM.Read(self.PC)
+                if self.decode_input == -1: break
+                
                 self.PC = self.PC + 1
 
     def dumpregs(self, iodir):
