@@ -208,16 +208,27 @@ class Core():
             self.VLR = int(instr_list[2][1:-1])
             ins.vectorLength = self.VLR
 
-        elif(ins.instr_name in ["LV",'SV',"LVI",'SVI',"LVWS",'SVWS']):
+        elif(ins.instr_name in ["LV","LVI","LVWS",]):
             ins.instr_queue = 1
             ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
             ins.vmem_ad = instr_list[2][1:-1].split(",")
             ins.vectorLength = self.VLR
+        
+        elif(ins.instr_name in ['SV','SVI','SVWS']):
+            ins.instr_queue = 1
+            ins.src_regs["Vector"] = [int(instr_list[1][2:])]
+            ins.vmem_ad = instr_list[2][1:-1].split(",")
+            ins.vectorLength = self.VLR
 
-        elif(ins.instr_name in ["LS","SS"]):
+        elif(ins.instr_name in ["LS"]):
             ins.instr_queue = 2
             ins.dst_regs["Scalar"] = [int(instr_list[1][2:])]
             ins.smem_ad = instr_list[2][1:-1].split(",")
+
+        elif(ins.instr_name in ["SS"]):
+            ins.instr_queue = 2
+            ins.src_regs["Scalar"] = [int(instr_list[1][2:])]
+            ins.smem_ad = instr_list[2][1:-1].split(",")        
 
         elif(ins.instr_name in ["ADD","SUB","AND","OR","XOR","SLL","SRL","SRA"]):
             ins.instr_queue = 2
