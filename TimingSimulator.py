@@ -17,7 +17,7 @@ class Config(object):
 
 class IMEM(object):
     def __init__(self, iodir):
-        self.size = pow(2, 16) # Can hold a maximum of 2^16 instructions.
+        #self.size = pow(2, 16) # Can hold a maximum of 2^16 instructions.
         self.filepath = os.path.abspath(os.path.join(iodir, "CodeOP.asm"))
         self.instructions = []
 
@@ -31,11 +31,11 @@ class IMEM(object):
             raise
 
     def Read(self, idx): # Use this to read from IMEM.
-        if idx < self.size:
+        #if idx < self.size:
             return self.instructions[idx].split()
-        else:
-            print("IMEM - ERROR: Invalid memory access at index: ", idx, " with memory size: ", self.size)
-            return -1
+        #else:
+            #print("IMEM - ERROR: Invalid memory access at index: ", idx, " with memory size: ", self.size)
+            #return -1
 
 class DMEM(object):
     # Word addressible - each address contains 32 bits.
@@ -140,7 +140,7 @@ class Core():
                     "VLR": RegisterFile("VLR", 1)
                 }  
         
-        self.busyBoard = {"scalar": [0]*8,"vector": [0]*8}
+        self.busyBoard = {"scalar": [False]*8,"vector": [False]*8}
         print(self.config.parameters)
 
         self.queues = {"vectorCompute":[],
@@ -169,40 +169,60 @@ class Core():
         # Decode functions here 
     
     def decode(self,instr_list):
+        """
+        Function to convert the instruction in a list format and creates an 
+        instruction object with the relavent properties.
+
+        Input   : instruction in list format
+        Output  : Object of instruction class
+        """
         # convert instuction list to instruction format
         # creating instruction object and loading default values
+
+        # TODO: Incorporate VLR in the instruction
+
         ins = instruction()
         ins.instr_name = instr_list[0]
+        
 
         if(ins.instr_name in ["ADDVV","SUBVV","MULVV","DIVVV","UNPACKLO","UNPACKHI","PACKLO","PACKHI"]):
             ins.instr_queue = 0
             ins.src_regs["Vector"] = [int(instr_list[2][2:]),int(instr_list[3][2:])]
             ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
+            ins.vectorLength = self.VLR
 
         elif(ins.instr_name in ["ADDVS","SUBVS","MULVS","DIVVS"]):
             ins.instr_queue = 0
             ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
             ins.src_regs["Vector"] = [int(instr_list[2][2:])]
             ins.src_regs["Scalar"] = [int(instr_list[3][2:])]
+            ins.vectorLength = self.VLR
             
         elif(ins.instr_name in ["POP","MTCL","MFCL"]):
             ins.instr_queue = 2
             ins.s_regs = [int(instr_list[1][2:])]
+            
+        elif(ins.instr_name in ["MTCL"]):
+            ins.instr_queue = 2
+            ins.s_regs = [int(instr_list[1][2:])]
+            self.VLR = int(instr_list[2][1:-1])
+            ins.vectorLength = self.VLR
 
         elif(ins.instr_name in ["LV",'SV',"LVI",'SVI',"LVWS",'SVWS']):
             ins.instr_queue = 1
-            ins.dst_regs["Vector"] = [instr_list[1][2:]]
+            ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
             ins.vmem_ad = instr_list[2][1:-1].split(",")
+            ins.vectorLength = self.VLR
 
         elif(ins.instr_name in ["LS","SS"]):
             ins.instr_queue = 2
-            ins.dst_regs["Scalar"] = [instr_list[1][2:]]
+            ins.dst_regs["Scalar"] = [int(instr_list[1][2:])]
             ins.smem_ad = instr_list[2][1:-1].split(",")
 
         elif(ins.instr_name in ["ADD","SUB","AND","OR","XOR","SLL","SRL","SRA"]):
             ins.instr_queue = 2
-            ins.dst_regs["Scalar"] = [instr_list[1][2:]]
-            ins.src_regs["Scalar"] = [instr_list[2][2:],instr_list[3][2:]]
+            ins.dst_regs["Scalar"] = [int(instr_list[1][2:])]
+            ins.src_regs["Scalar"] = [int(instr_list[2][2:]),int(instr_list[3][2:])]
         
         elif(ins.instr_name in ["CVM"]):
             ins.instr_queue = 2 # confirm if this is correct
@@ -212,67 +232,133 @@ class Core():
 
         elif(ins.instr_name in ["SEQVV","SNEVV","SGTVV","SLTVV","SGEVV","SLEVV"]):
             ins.instr_queue = 0
-            ins.src_regs["Vector"] = [instr_list[1][2:],instr_list[2][2:]]
+            ins.src_regs["Vector"] = [int(instr_list[1][2:]),int(instr_list[2][2:])]
+            ins.vectorLength = self.VLR
 
         elif(ins.instr_name in ["SEQVS","SNEVS","SGTVS","SLTVS","SGEVS","SLEVS"]):
             ins.instr_queue = 0
-            ins.src_regs["Vector"] = [instr_list[1][2:]]
-            ins.src_regs["Scalar"] = [instr_list[2][2:]]
+            ins.src_regs["Vector"] = [int(instr_list[1][2:])]
+            ins.src_regs["Scalar"] = [int(instr_list[2][2:])]
+            ins.vectorLength = self.VLR
 
         else: 
-            print("UNKNOWN INSTRUCTION")
+            print("UNKNOWN INSTRUCTION",instr_list)
             return -1
         
         return ins
     
     def CheckQueue(self,ins):
-        # checks busyboard and if queues are full
-        return
+        # checking if queues are full (saves busyboard lookup)
+        if(ins.instr_queue == 0):
+            if(len(self.queues["vectorCompute"])>self.config.parameters["computeQueueDepth"]):
+                print("Compute Queue depth exceeded")
+            if(len(self.queues["vectorCompute"])>=self.config.parameters["computeQueueDepth"]):
+                return False
+        elif(ins.instr_queue == 1):
+            if(len(self.queues["vectorData"])>self.config.parameters["dataQueueDepth"]):
+                print("Vector Data Queue depth exceeded")
+            if(len(self.queues["vectorData"])>=self.config.parameters["dataQueueDepth"]):
+                return False
+        elif(ins.instr_queue == 2):
+            if(len(self.queues["scalarOps"])>self.config.parameters["computeQueueDepth"]):
+                print("Scalar Queue depth exceeded")
+            if(len(self.queues["scalarOps"])>=self.config.parameters["computeQueueDepth"]):
+                return False
+
+        # checking busyboard
+        for reg in ins.src_regs["Scalar"]:
+            if self.busyBoard["scalar"][reg]: return False
+        for reg in ins.src_regs["Vector"]:
+            if self.busyBoard["vector"][reg]: return False
+        
+        return True
     
     def sendToQueue(self,ins):
-        #append to queues
+        """
+        Function appends the instruction to the appropriate queue
+        input   : instruction object
+        output  : status of appending to the queue
+        """
+        # set busyboard to high: only to the ones we are writing to
         if(ins.instr_queue == 0):
             if(len(self.queues["vectorCompute"])<self.config.parameters["computeQueueDepth"]):
                 self.queues["vectorCompute"].append(ins)
+                for reg in ins.dst_regs["Vector"]:
+                    self.busyBoard["vector"][reg] = True
             else: return -1
         elif(ins.instr_queue == 1):
             if(len(self.queues["vectorData"])<self.config.parameters["dataQueueDepth"]):
                 self.queues["vectorData"].append(ins)
+                for reg in ins.dst_regs["Vector"]:
+                    self.busyBoard["vector"][reg] = True
             else: return -1
         elif(ins.instr_queue == 2):
             if(len(self.queues["scalarOps"])<self.config.parameters["computeQueueDepth"]):
                 self.queues["scalarOps"].append(ins)
+                for reg in ins.dst_regs["Scalar"]:
+                    self.busyBoard["scalar"][reg] = True
             else: return -1
-        return
+        return 0
+    
+    def checkCompute(self): # @Ishaan this is your job
+        """
+        Function to check whether the compute resource is available or not
+        Returns a list of 3 booleans
+        """
+        res_list = []
+        if len(self.queues["vectorCompute"]) > 0:
+            instr = self.queues["vectorCompute"][0]
+            #print(instr.instr_name)
+            # checks the three pipelines
+
+
+        return res_list
+    
+    def sendToCompute(self,condition_list): 
+        # This is a placeholder function
+        returned_inst_list = [None,None,None]
+
+        if len(self.queues["vectorCompute"])>0 and condition_list[0]==True:
+            returned_inst_list[0] = self.queues["vectorCompute"].pop(0)
+
+        if len(self.queues["vectorData"])>0 and condition_list[1]==True:
+            returned_inst_list[1] = self.queues["vectorData"].pop(0)
+
+        if len(self.queues["scalarOps"])>0 and condition_list[2]==True:
+            returned_inst_list[2] = self.queues["scalarOps"].pop(0)
+        
+        return returned_inst_list
        
         
     def run(self):
-        self.PC = 4
+        self.PC = 0
         self.CycleCount = 0
 
         while(True):
             # Send to Compute
-            #self.instr_op = self.sendToCompute(self.instrToBeCompute)
+            
+            queue_status = self.checkCompute()
+            self.instrToBeExecuted = self.sendToCompute(queue_status)
 
             # Decode and SendToQueue
             if len(self.decode_input)>0:
                 self.instrToBeQueued = self.decode(self.decode_input)
                 if self.instrToBeQueued == -1: break
-                #addToQueue = self.CheckQueue(self.instrToBeQueued) # checks busyboard and if queues are full
-                addToQueue = True
-
+                addToQueue = self.CheckQueue(self.instrToBeQueued) # checks busyboard and if queues are full
+                print("addToQueue:",addToQueue)
                 if addToQueue:
-                    
                     self.sendToQueue(self.instrToBeQueued)
                 else: # set NOPS
                     self.nop["Fetch"] = True
 
-            # Fetch
+            #print(self.queues)
 
+            # Fetch
+            print(self.PC, self.decode_input)
             if not self.nop["Fetch"]:
                 self.decode_input = self.IMEM.Read(self.PC)
                 if self.decode_input == -1: break
-                
+                print(self.PC, self.decode_input)
                 self.PC = self.PC + 1
 
     def dumpregs(self, iodir):
