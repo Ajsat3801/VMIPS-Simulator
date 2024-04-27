@@ -374,12 +374,13 @@ class Core():
         Function to check whether the compute resource is available or not
         Returns a list of 3 booleans
         """
-        res_list = []
+        res_list = [False,False,False]
         if len(self.queues["vectorCompute"]) > 0:
             instr = self.queues["vectorCompute"][0]
-            #print(instr.instr_name)
-            # checks the three pipelines
-
+            if(self.resources_busy[instr.computeResource][0] == False): res_list[0] = True
+        if len(self.queues["vectorData"]) > 0:
+            if(self.resources_busy["Memory"][0] == False): res_list[1] = True
+        if len(self.queues["scalarOps"]) > 0:  res_list[2] = True
 
         return res_list
     
