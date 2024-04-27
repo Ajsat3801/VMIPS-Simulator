@@ -311,7 +311,7 @@ class Core():
             else: return -1
         return 0
     
-    def checkCompute(self): # @Ishaan this is your job
+    def checkResources(self): # @Ishaan this is your job
         """
         Function to check whether the compute resource is available or not
         Returns a list of 3 booleans
@@ -325,7 +325,7 @@ class Core():
 
         return res_list
     
-    def sendToCompute(self,condition_list): 
+    def sendToResources(self,condition_list): 
         # This is a placeholder function
         returned_inst_list = [None,None,None]
 
@@ -339,17 +339,52 @@ class Core():
             returned_inst_list[2] = self.queues["scalarOps"].pop(0)
         
         return returned_inst_list
-       
+    
+    def calculateNoComputeCycles(self,instr):
+        # Requires Discussion
+        return
+    
+    def compute(self,instr):
+        # decrement all counters if not zero
+
+        #if(the resource ka value is not busy; 
+        #   countdown is 0
+        #   and there is an instruction dispatched to use it):
+            # set countdown values
+        #else: # decrement the countdown
+        return
+    
+    def calculateNoMemoryCycles(self,instr):
+        # Requires Discussion
+        # calculate number of cycles to be taken in memory by simulating it
+        return cycleCount
+
+    def memory(self,instr):
+        # decrement all counters if not zero
+
+        #if(the resource ka value is not busy; 
+        #   countdown is 0
+        #   and there is an instruction dispatched to use it):
+            # set countdown values
+        #else: # decrement the countdown
+        return
+
         
     def run(self):
         self.PC = 0
         self.CycleCount = 0
 
         while(True):
+
+            #Compute stage; decrement compute counter
+            if self.instrToBeExecuted[0] is not None: self.compute(self.instrToBeExecuted[0])
+            if self.instrToBeExecuted[1] is not None: self.memory(self.instrToBeExecuted[1])
+            # do for memory and scalar too
+
             # Send to Compute
             
-            queue_status = self.checkCompute()
-            self.instrToBeExecuted = self.sendToCompute(queue_status)
+            queue_status = self.checkResources() # Returns list of booleans
+            self.instrToBeExecuted = self.sendToResources(queue_status)
 
             # Decode and SendToQueue
             if len(self.decode_input)>0:
