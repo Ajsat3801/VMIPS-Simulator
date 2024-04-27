@@ -185,20 +185,77 @@ class Core():
         ins.instr_name = instr_list[0]
         
 
-        if(ins.instr_name in ["ADDVV","SUBVV","MULVV","DIVVV","UNPACKLO","UNPACKHI","PACKLO","PACKHI"]):
+        if(ins.instr_name in ["ADDVV","SUBVV"]):
             ins.instr_queue = 0
             ins.src_regs["Vector"] = [int(instr_list[2][2:]),int(instr_list[3][2:])]
             ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
             ins.vectorLength = self.VLR
+            ins.vectorMask = self.VMR
+            ins.computeResource = "Adder"
 
-        elif(ins.instr_name in ["ADDVS","SUBVS","MULVS","DIVVS"]):
+        elif(ins.instr_name in ["ADDVS","SUBVS"]):
             ins.instr_queue = 0
             ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
             ins.src_regs["Vector"] = [int(instr_list[2][2:])]
             ins.src_regs["Scalar"] = [int(instr_list[3][2:])]
             ins.vectorLength = self.VLR
+            ins.vectorMask = self.VMR
+            ins.computeResource = "Adder"
+
+        elif(ins.instr_name == "MULVV"):
+            ins.instr_queue = 0
+            ins.src_regs["Vector"] = [int(instr_list[2][2:]),int(instr_list[3][2:])]
+            ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
+            ins.vectorLength = self.VLR
+            ins.vectorMask = self.VMR
+            ins.computeResource = "Multiplier"
+
+        elif(ins.instr_name == "MULVS"):
+            ins.instr_queue = 0
+            ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
+            ins.src_regs["Vector"] = [int(instr_list[2][2:])]
+            ins.src_regs["Scalar"] = [int(instr_list[3][2:])]
+            ins.vectorLength = self.VLR
+            ins.vectorMask = self.VMR
+            ins.computeResource = "Multiplier"
+
+        elif(ins.instr_name == "DIVVV"):
+            ins.instr_queue = 0
+            ins.src_regs["Vector"] = [int(instr_list[2][2:]),int(instr_list[3][2:])]
+            ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
+            ins.vectorLength = self.VLR
+            ins.vectorMask = self.VMR
+            ins.computeResource = "Divider"
+
+        elif(ins.instr_name == "DIVVS"):
+            ins.instr_queue = 0
+            ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
+            ins.src_regs["Vector"] = [int(instr_list[2][2:])]
+            ins.src_regs["Scalar"] = [int(instr_list[3][2:])]
+            ins.vectorLength = self.VLR
+            ins.vectorMask = self.VMR
+            ins.computeResource = "Divider"
+
+        elif(ins.instr_name =="SVV"):
+            ins.instr_queue = 0
+            ins.src_regs["Vector"] = [int(instr_list[1][2:]),int(instr_list[2][2:])]
+            ins.vectorLength = self.VLR
+            self.VMR = instr_list[3][1:-1].split(",")
+            ins.computeResource = "Adder"
+
+        elif(ins.instr_name == "SVS"):
+            ins.instr_queue = 0
+            ins.src_regs["Vector"] = [int(instr_list[1][2:])]
+            ins.src_regs["Scalar"] = [int(instr_list[2][2:])]
+            self.VMR = instr_list[3][1:-1].split(",")
+            ins.computeResource = "Adder"
+
+        elif(ins.instr_name in ["CVM"]):
+            ins.instr_queue = 0
+            self.VMR=[1]*64
+            ins.computeResource = "Adder"
             
-        elif(ins.instr_name in ["POP","MTCL","MFCL"]):
+        elif(ins.instr_name in ["POP","MFCL"]):
             ins.instr_queue = 2
             ins.s_regs = [int(instr_list[1][2:])]
             
@@ -213,12 +270,14 @@ class Core():
             ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
             ins.vmem_ad = instr_list[2][1:-1].split(",")
             ins.vectorLength = self.VLR
-        
+            ins.vectorMask = self.VMR
+
         elif(ins.instr_name in ['SV','SVI','SVWS']):
             ins.instr_queue = 1
             ins.src_regs["Vector"] = [int(instr_list[1][2:])]
             ins.vmem_ad = instr_list[2][1:-1].split(",")
             ins.vectorLength = self.VLR
+            ins.vectorMask = self.VMR
 
         elif(ins.instr_name in ["LS"]):
             ins.instr_queue = 2
@@ -235,22 +294,16 @@ class Core():
             ins.dst_regs["Scalar"] = [int(instr_list[1][2:])]
             ins.src_regs["Scalar"] = [int(instr_list[2][2:]),int(instr_list[3][2:])]
         
-        elif(ins.instr_name in ["CVM"]):
-            ins.instr_queue = 2 # confirm if this is correct
-
         elif(ins.instr_name == "B"):
             ins.instr_queue = 2 # again confirm if correct
 
-        elif(ins.instr_name in ["SEQVV","SNEVV","SGTVV","SLTVV","SGEVV","SLEVV"]):
+        elif(ins.instr_name in ["UNPACKLO","UNPACKHI","PACKLO","PACKHI"]):
             ins.instr_queue = 0
-            ins.src_regs["Vector"] = [int(instr_list[1][2:]),int(instr_list[2][2:])]
+            ins.src_regs["Vector"] = [int(instr_list[2][2:]),int(instr_list[3][2:])]
+            ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
             ins.vectorLength = self.VLR
-
-        elif(ins.instr_name in ["SEQVS","SNEVS","SGTVS","SLTVS","SGEVS","SLEVS"]):
-            ins.instr_queue = 0
-            ins.src_regs["Vector"] = [int(instr_list[1][2:])]
-            ins.src_regs["Scalar"] = [int(instr_list[2][2:])]
-            ins.vectorLength = self.VLR
+            ins.vectorMask = self.VMR
+            ins.computeResource = "Shuffle"
 
         else: 
             print("UNKNOWN INSTRUCTION",instr_list)
@@ -281,37 +334,42 @@ class Core():
             if self.busyBoard["scalar"][reg]: return False
         for reg in ins.src_regs["Vector"]:
             if self.busyBoard["vector"][reg]: return False
+
+        for reg in ins.dst_regs["Scalar"]:
+            if self.busyBoard["scalar"][reg]: return False
+        for reg in ins.dst_regs["Vector"]:
+            if self.busyBoard["vector"][reg]: return False
         
         return True
     
     def sendToQueue(self,ins):
         """
         Function appends the instruction to the appropriate queue
+        Also sets the busyboard to high for the registers used by the instruction
         input   : instruction object
         output  : status of appending to the queue
         """
-        # set busyboard to high: only to the ones we are writing to
         if(ins.instr_queue == 0):
             if(len(self.queues["vectorCompute"])<self.config.parameters["computeQueueDepth"]):
                 self.queues["vectorCompute"].append(ins)
-                for reg in ins.dst_regs["Vector"]:
-                    self.busyBoard["vector"][reg] = True
+                for reg in ins.src_regs["Vector"]: self.busyBoard["vector"][reg] = True
+                for reg in ins.dst_regs["Vector"]: self.busyBoard["vector"][reg] = True
             else: return -1
         elif(ins.instr_queue == 1):
             if(len(self.queues["vectorData"])<self.config.parameters["dataQueueDepth"]):
                 self.queues["vectorData"].append(ins)
-                for reg in ins.dst_regs["Vector"]:
-                    self.busyBoard["vector"][reg] = True
+                for reg in ins.src_regs["Vector"]:self.busyBoard["vector"][reg] = True
+                for reg in ins.dst_regs["Vector"]:self.busyBoard["vector"][reg] = True
             else: return -1
         elif(ins.instr_queue == 2):
             if(len(self.queues["scalarOps"])<self.config.parameters["computeQueueDepth"]):
                 self.queues["scalarOps"].append(ins)
-                for reg in ins.dst_regs["Scalar"]:
-                    self.busyBoard["scalar"][reg] = True
+                for reg in ins.src_regs["Scalar"]: self.busyBoard["scalar"][reg] = True
+                for reg in ins.dst_regs["Scalar"]: self.busyBoard["scalar"][reg] = True
             else: return -1
         return 0
     
-    def checkResources(self): # @Ishaan this is your job
+    def checkResources(self):
         """
         Function to check whether the compute resource is available or not
         Returns a list of 3 booleans
