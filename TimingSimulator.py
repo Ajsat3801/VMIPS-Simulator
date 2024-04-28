@@ -104,8 +104,9 @@ class RegisterFile(object):
             raise
 
 class instruction():
-    def __init__(self,instr_name,instr_queue,src_regs,dst_regs,smem_ad,vmem_ad,instr_cycleCount):
-        # Each instruction after decoding will contain the following metadata
+    def __init__(self,instr_name,instr_queue,src_regs,dst_regs,smem_ad,vmem_ad,
+                 instr_cycleCount,vectorLength,vectorMask,computeResource):
+       # Each instruction after decoding will contain the following metadata
         self.instr_name = instr_name
         self.instr_queue = instr_queue              # number indicating which queue to enter
                                                     # 0: VectorCompute Queue; 1: VectorData Queue; 2: ScalarOps Queue
@@ -114,6 +115,9 @@ class instruction():
         self.smem_ad = smem_ad                      # list of all scalar memory addresses used
         self.vmem_ad = vmem_ad                      # likewise for vector memory addresses
         self.instr_cycleCount = instr_cycleCount    # Number of cycles instruction takes
+        self.vectorLength = vectorLength
+        self.vectorMask = vectorMask
+        self.computeResource = computeResource
     
     def __init__(self):
         # Constructor with default values
@@ -124,6 +128,9 @@ class instruction():
         self.smem_ad = []
         self.vmem_ad = []
         self.instr_cycleCount = 0
+        self.vectorLength = 0
+        self.vectorMask = [1]*64
+        self.computeResource = ""
 
 class Core():
     def __init__(self, imem, sdmem, vdmem, config):
@@ -133,6 +140,8 @@ class Core():
         self.config = config
         self.PC = 0
         self.CycleCount = 0
+        self.VLR = 0
+        self.VMR = [1]*64
 
         self.RFs = {"SRF": RegisterFile("SRF", 8),      # 8 registers of 32 bit integers
                     "VRF": RegisterFile("VRF", 8, 64),  # 8 registers of 64 elements; each of 32 bits
@@ -154,8 +163,13 @@ class Core():
         self.instrToBeQueued = instruction()
         self.instrToBeCompute = instruction()
         self.decode_input = []
+        self.instrToBeExecuted = [None, None, None]
+        self.resources_busy = {"Adder":[False,0],"Multiplier":[False,0],
+                               "Divider":[False,0],"Shuffle":[False,0],"Memory":[False,0]
+                               }
+        self.banks_busy = [[False,0]]*config.parameters["vdmNumBanks"]
         
-
+        self.computeResource_countdown = [0,0,0,0]
         self.nop = {"Fetch":False,
                       "Decode":True,
                       "SendToCompute":True}
@@ -385,7 +399,7 @@ class Core():
         return res_list
     
     def sendToResources(self,condition_list): 
-        # This is a placeholder function
+        
         returned_inst_list = [None,None,None]
 
         if len(self.queues["vectorCompute"])>0 and condition_list[0]==True:
