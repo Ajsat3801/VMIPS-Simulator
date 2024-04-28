@@ -764,6 +764,7 @@ class Core():
                 VR1[i] = self.VDMEM.Read(SR1+i)
                 op_str += str(SR1+i)
                 op_str +=","
+            else: op_str+="-1,"
         op_str= op_str[:-1] + ")"
         
         self.RFs["VRF"].Write(int(instr_list[1][2:]),VR1)
@@ -787,6 +788,7 @@ class Core():
                 self.VDMEM.Write(SR1 + i, VR1[i])
                 op_str += str(SR1+i)
                 op_str +=","
+            else: op_str+="-1,"
         op_str= op_str[:-1] + ")"
         self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+op_str) 
         return 0
@@ -808,6 +810,7 @@ class Core():
                 VR1[i] = self.VDMEM.Read(SR1 + VR2[i])
                 op_str += str(SR1 + VR2[i])
                 op_str +=","
+            else: op_str+="-1,"
         op_str= op_str[:-1] + ")"
         
         self.RFs["VRF"].Write(int(instr_list[1][2:]),VR1)
@@ -832,6 +835,7 @@ class Core():
                 self.VDMEM.Write(SR1 + VR2[i], VR1[i])
                 op_str += str(SR1 + VR2[i])
                 op_str +=","
+            else: op_str+="-1,"
         op_str= op_str[:-1] + ")"
 
         self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+op_str) 
@@ -854,6 +858,7 @@ class Core():
                 VR1[i] = self.VDMEM.Read(SR1 + (SR2 * i))
                 op_str += str(SR1 + (SR2 * i))
                 op_str +=","
+            else: op_str+="-1,"
         op_str= op_str[:-1] + ")"
         
         self.RFs["VRF"].Write(int(instr_list[1][2:]),VR1)
@@ -878,6 +883,7 @@ class Core():
                 self.VDMEM.Write(SR1 + (SR2 * i), VR1[i])
                 op_str += str(SR1 + (SR2 * i))
                 op_str +=","
+            else: op_str+="-1,"
         op_str= op_str[:-1] + ")"
         self.IMEM.unrolled_instructions.append(instr_list[0]+" "+instr_list[1]+" "+op_str) 
         return 0

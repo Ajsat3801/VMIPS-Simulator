@@ -415,7 +415,20 @@ class Core():
     
     def calculateNoComputeCycles(self,instr):
         # Requires Discussion
-        return
+        lanes = [0]*config.parameters["numLanes"]
+        for i in range(instr.vectorLength):
+            lanes[1%config.parameters["numLanes"]] += instr.vectorMask[i]
+
+        if instr.computeResource == "Adder":
+            cycleCount = config.parameters["pipelineDepthAdd"] + max(lanes) - 1 
+        elif instr.computeResource == "Multiplier":
+            cycleCount = config.parameters["pipelineDepthMul"] + max(lanes) - 1 
+        elif instr.computeResource == "Divider":
+            cycleCount = config.parameters["pipelineDepthDiv"] + max(lanes) - 1 
+        elif instr.computeResource == "Shuffle":
+            cycleCount = config.parameters["pipelineDepthShuffle"] + max(lanes) - 1 
+            
+        return cycleCount
     
     def compute(self,instr):
         # decrement all counters if not zero
