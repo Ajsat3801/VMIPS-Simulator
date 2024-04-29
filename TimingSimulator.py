@@ -139,7 +139,6 @@ class Core():
         self.VDMEM = vdmem
         self.config = config
         self.PC = 0
-        self.CycleCount = 0
         self.VLR = 0
         self.VMR = [1]*64
 
