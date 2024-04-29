@@ -147,7 +147,7 @@ class Core():
                     "VRF": RegisterFile("VRF", 8, 64),  # 8 registers of 64 elements; each of 32 bits
                     "VMR": RegisterFile("VMR", 1, 64),
                     "VLR": RegisterFile("VLR", 1)
-                }  
+                }
         
         self.busyBoard = {"scalar": [False]*8,"vector": [False]*8}
         print(self.config.parameters)
@@ -165,17 +165,15 @@ class Core():
         self.decode_input = []
         self.instrToBeExecuted = [None, None, None]
         self.resources_busy = {"Adder":[False,0],"Multiplier":[False,0],
-                               "Divider":[False,0],"Shuffle":[False,0],"Memory":[False,0]
+                               "Divider":[False,0],"Shuffle":[False,0],
+                               "Memory":[False,0]
                                }
         self.banks_busy = [[False,0]]*config.parameters["vdmNumBanks"]
         
-        self.computeResource_countdown = [0,0,0,0]
         self.nop = {"Fetch":False,
                       "Decode":True,
                       "SendToCompute":True}
-        
-        self.stall_frontend = False
-        
+                
         # Your code here.
 
         # Execute functions here
@@ -417,7 +415,7 @@ class Core():
         # Requires Discussion
         lanes = [0]*config.parameters["numLanes"]
         for i in range(instr.vectorLength):
-            lanes[1%config.parameters["numLanes"]] += instr.vectorMask[i]
+            lanes[i%config.parameters["numLanes"]] += instr.vectorMask[i]
 
         if instr.computeResource == "Adder":
             cycleCount = config.parameters["pipelineDepthAdd"] + max(lanes) - 1 
@@ -427,7 +425,7 @@ class Core():
             cycleCount = config.parameters["pipelineDepthDiv"] + max(lanes) - 1 
         elif instr.computeResource == "Shuffle":
             cycleCount = config.parameters["pipelineDepthShuffle"] + max(lanes) - 1 
-            
+
         return cycleCount
     
     def compute(self,instr):
@@ -492,6 +490,15 @@ class Core():
                 if self.decode_input == -1: break
                 print(self.PC, self.decode_input)
                 self.PC = self.PC + 1
+
+            self.CycleCount+=1
+
+            endCondition = True
+            for resource in self.resources_busy:
+                if self.resoures_busy[resource][0]: endCondition = False
+            for queue in self.queues:
+                if len(self.queues[queue])>0: endCondition = False
+            if endCondition == True: return self.CycleCount
 
     def dumpregs(self, iodir):
         for rf in self.RFs.values():
