@@ -18,7 +18,7 @@ class Config(object):
 class IMEM(object):
     def __init__(self, iodir):
         #self.size = pow(2, 16) # Can hold a maximum of 2^16 instructions.
-        self.filepath = os.path.abspath(os.path.join(iodir, "CodeOP.asm"))
+        self.filepath = os.path.abspath(os.path.join(iodir, "trace.asm"))
         self.instructions = []
 
         try:
@@ -165,8 +165,9 @@ class Core():
         self.instrToBeExecuted = [None, None, None]
         self.resources_busy = {"Adder":[False,0],"Multiplier":[False,0],
                                "Divider":[False,0],"Shuffle":[False,0],
-                               "Memory":[False,0]
-                               }
+                               "Memory":[False,0],
+                               "Scalar": [False, 0]
+                              }
         self.banks_busy = [[False,0]]*config.parameters["vdmNumBanks"]
         
         self.nop = {"Fetch":False,
@@ -429,19 +430,87 @@ class Core():
     
     def compute(self,instr):
         # decrement all counters if not zero
-
-        #if(the resource ka value is not busy; 
-        #   countdown is 0
-        #   and there is an instruction dispatched to use it):
-            # set countdown values
-        #else: # decrement the countdown
+        keys = list(self.resources_busy.keys())
+        for resource in keys[:-2]:
+            if self.resources_busy[resource][0]:
+                if self.resources_busy[resource][1] > 0:
+                    self.resources_busy[resource][1] -= 1
+                else:
+                    self.resources_busy[resource][0] = False
+                    self.resources_busy[resource][1] = 0
+            
+        if not self.resources_busy[instr.computeResource][0]:
+            self.resources_busy[instr.computeResource][0] = True
+            self.resources_busy[instr.computeResource][1] = self.calculateNoComputeCycles(instr)
+            
+            for reg in instr.src_regs["Scalar"]:
+                self.busyBoard["scalar"][reg] = True
+            for reg in instr.src_regs["Vector"]:
+                self.busyBoard["vector"][reg] = True
+            for reg in instr.dst_regs["Scalar"]:
+                self.busyBoard["scalar"][reg] = True
+            for reg in instr.dst_regs["Vector"]:
+                self.busyBoard["vector"][reg] = True
+        
         return
     
     def calculateNoMemoryCycles(self,instr):
         # Requires Discussion
         # calculate number of cycles to be taken in memory by simulating it
-        return cycleCount
 
+        # creating the queues for each lane:
+        vls_pipelines = [[]] * config.parameters["numLanes"]
+        # assigning each memory access to a queue
+        for i in range(instr.vectorLength):
+            if instr.vmem_ad[i] == -1:
+                continue
+            else:
+                vls_pipelines[i % config.parameters["numLanes"]].append(instr.vmem_ad[i])
+        
+        # now we simulate all the memory accesses, and calculate the number of cycles to execute this instruction
+        # to calculate which bank it should access, we mod the address by the number of banks
+
+        cycleCount = 0
+        while True:
+
+            # setting checks for if we have finished processing all memory addresses:
+            all_lanes_free = True
+            all_banks_free = True
+            
+            # Let's check all banks
+            # if bank is busy, check countdown. If it is zero, set to bank free. If nonzero, decrement by 1
+            for each_bank in self.banks_busy:
+                if each_bank[0] == True:
+                    all_banks_free = False
+                    if each_bank[1] == 0:
+                        each_bank[0] = False
+                    else:
+                        each_bank[1] -= 1
+
+            # checking each lane
+            # now we will process each lane in order, automatically giving priority to the lower index
+            for each_lane in vls_pipelines:
+                if len(each_lane) > 0:
+                    all_lanes_free = False
+
+                    # let's look at the head of the queue and check which bank we should send the address to:
+                    mem_addr = int(each_lane[0])
+                    # print(type(mem_addr))
+                    bank_idx = mem_addr % config.parameters["vdmNumBanks"]
+
+                    # let's check that bank: if it isn't busy, we dispatch our request. else, do nothing.
+                    if self.banks_busy[bank_idx][0] == False:
+                        each_lane.pop(0)
+                        self.banks_busy[bank_idx][0] = True
+                        self.banks_busy[bank_idx][1] = config.parameters["vdmBankBusyTime"]
+
+            # termination condition
+            if all_lanes_free and all_banks_free:
+                return cycleCount
+
+            # incrementing cycle count
+            cycleCount += 1
+            
     def memory(self,instr):
         # decrement all counters if not zero
 
@@ -450,6 +519,44 @@ class Core():
         #   and there is an instruction dispatched to use it):
             # set countdown values
         #else: # decrement the countdown
+        # update busyboard too 
+        if self.resources_busy["Memory"][0] == True and self.resources_busy["Memory"][1] > 0:
+            self.resources_busy["Memory"][1] -= 1
+        elif self.resources_busy["Memory"][0] == True and self.resources_busy["Memory"][1] <= 0:
+            self.resources_busy["Memory"][0] = False
+            self.resources_busy["Memory"][1] = 0
+        else:
+            self.resources_busy["Memory"][0] = True
+            self.resources_busy["Memory"][1] = self.calculateNoMemoryCycles(instr)
+            for reg in instr.src_regs["Scalar"]:
+                self.busyBoard["scalar"][reg] = True
+            for reg in instr.src_regs["Vector"]:
+                self.busyBoard["vector"][reg] = True
+            for reg in instr.dst_regs["Scalar"]:
+                self.busyBoard["scalar"][reg] = True
+            for reg in instr.dst_regs["Vector"]:
+                self.busyBoard["vector"][reg] = True
+        
+        return
+    
+    def scalar(self, instr):
+        if self.resources_busy["Scalar"][0] == True and self.resources_busy["Scalar"][1] > 0:
+            self.resources_busy["Scalar"][1] -= 1
+        elif self.resources_busy["Scalar"][0] == True and self.resources_busy["Scalar"][1] <= 0:
+            self.resources_busy["Scalar"][0] = False
+            self.resources_busy["Scalar"][1] = 0
+        else:
+            self.resources_busy["Scalar"][0] = True
+            self.resources_busy["Scalar"][1] = 1
+            for reg in instr.src_regs["Scalar"]:
+                self.busyBoard["scalar"][reg] = True
+            for reg in instr.src_regs["Vector"]:
+                self.busyBoard["vector"][reg] = True
+            for reg in instr.dst_regs["Scalar"]:
+                self.busyBoard["scalar"][reg] = True
+            for reg in instr.dst_regs["Vector"]:
+                self.busyBoard["vector"][reg] = True
+        
         return
 
         
@@ -462,6 +569,7 @@ class Core():
             #Compute stage; decrement compute counter
             if self.instrToBeExecuted[0] is not None: self.compute(self.instrToBeExecuted[0])
             if self.instrToBeExecuted[1] is not None: self.memory(self.instrToBeExecuted[1])
+            if self.instrToBeExecuted[2] is not None: self.scalar(self.instrToBeExecuted[2])
             # do for memory and scalar too
 
             # Send to Compute
@@ -470,7 +578,10 @@ class Core():
             self.instrToBeExecuted = self.sendToResources(queue_status)
 
             # Decode and SendToQueue
+            print("length of decode input")
+            print(len(self.decode_input))
             if len(self.decode_input)>0:
+                print("Decoding...")
                 self.instrToBeQueued = self.decode(self.decode_input)
                 if self.instrToBeQueued == -1: break
                 addToQueue = self.CheckQueue(self.instrToBeQueued) # checks busyboard and if queues are full
@@ -485,6 +596,7 @@ class Core():
             # Fetch
             print(self.PC, self.decode_input)
             if not self.nop["Fetch"]:
+                print("fetching...")
                 self.decode_input = self.IMEM.Read(self.PC)
                 if self.decode_input == -1: break
                 print(self.PC, self.decode_input)
@@ -492,12 +604,18 @@ class Core():
 
             self.CycleCount+=1
 
+            if self.CycleCount == 100:
+                return self.CycleCount
+            
             endCondition = True
             for resource in self.resources_busy:
-                if self.resoures_busy[resource][0]: endCondition = False
+                if self.resources_busy[resource][0]: endCondition = False
             for queue in self.queues:
                 if len(self.queues[queue])>0: endCondition = False
-            if endCondition == True: return self.CycleCount
+            if len(self.decode_input) > 0: endCondition = False
+            if endCondition == True: 
+                print("ending")
+                return self.CycleCount
 
     def dumpregs(self, iodir):
         for rf in self.RFs.values():
@@ -526,7 +644,8 @@ if __name__ == "__main__":
     vcore = Core(imem, sdmem, vdmem, config)
 
     # Run Core
-    vcore.run()   
+    cycles = vcore.run()
+    print(cycles)
     vcore.dumpregs(iodir)
 
     sdmem.dump()
