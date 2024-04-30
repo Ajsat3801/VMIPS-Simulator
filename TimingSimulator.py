@@ -163,10 +163,10 @@ class Core():
         self.instrToBeCompute = instruction()
         self.decode_input = []
         self.instrToBeExecuted = [None, None, None]
-        self.resources_busy = {"Adder":[False,0],"Multiplier":[False,0],
-                               "Divider":[False,0],"Shuffle":[False,0],
-                               "Memory":[False,0],
-                               "Scalar": [False, 0]
+        self.resources_busy = {"Adder":[None,0],"Multiplier":[None,0],
+                               "Divider":[None,0],"Shuffle":[None,0],
+                               "Memory":[None,0],
+                               "Scalar": [None, 0]
                               }
         self.banks_busy = [[False,0]]*config.parameters["vdmNumBanks"]
         
@@ -316,11 +316,8 @@ class Core():
             ins.vectorLength = self.VLR
             ins.vectorMask = self.VMR
             ins.computeResource = "Shuffle"
-
-        else: 
-            print("UNKNOWN INSTRUCTION",instr_list)
-            return -1
         
+        elif (ins.instr_name =="HALT"): self.nop["Fetch"] = True
         return ins
     
     def CheckQueue(self,ins):
@@ -340,6 +337,7 @@ class Core():
                 print("Scalar Queue depth exceeded")
             if(len(self.queues["scalarOps"])>=self.config.parameters["computeQueueDepth"]):
                 return False
+        elif(ins.instr_name == "HALT"): return False
 
         # checking busyboard
         for reg in ins.src_regs["Scalar"]:
@@ -389,9 +387,9 @@ class Core():
         res_list = [False,False,False]
         if len(self.queues["vectorCompute"]) > 0:
             instr = self.queues["vectorCompute"][0]
-            if(self.resources_busy[instr.computeResource][0] == False): res_list[0] = True
+            if(self.resources_busy[instr.computeResource][0] is None): res_list[0] = True
         if len(self.queues["vectorData"]) > 0:
-            if(self.resources_busy["Memory"][0] == False): res_list[1] = True
+            if(self.resources_busy["Memory"][0] is None): res_list[1] = True
         if len(self.queues["scalarOps"]) > 0:  res_list[2] = True
 
         return res_list
@@ -428,29 +426,34 @@ class Core():
 
         return cycleCount
     
-    def compute(self,instr):
+    def compute(self):
+        
         # decrement all counters if not zero
         keys = list(self.resources_busy.keys())
         for resource in keys[:-2]:
-            if self.resources_busy[resource][0]:
+            if self.resources_busy[resource][0] is not None:
                 if self.resources_busy[resource][1] > 0:
                     self.resources_busy[resource][1] -= 1
+                    print(self.resources_busy[resource][1])
                 else:
-                    self.resources_busy[resource][0] = False
+                    print("inside else condition")
+                    for reg in self.resources_busy[resource][0].src_regs["Scalar"]:
+                        self.busyBoard["scalar"][reg] = False
+                    for reg in self.resources_busy[resource][0].src_regs["Vector"]:
+                        self.busyBoard["vector"][reg] = False
+                    for reg in self.resources_busy[resource][0].dst_regs["Scalar"]:
+                        self.busyBoard["scalar"][reg] = False
+                    for reg in self.resources_busy[resource][0].dst_regs["Vector"]:
+                        self.busyBoard["vector"][reg] = False
+
+                    self.resources_busy[resource][0] = None
                     self.resources_busy[resource][1] = 0
             
-        if not self.resources_busy[instr.computeResource][0]:
-            self.resources_busy[instr.computeResource][0] = True
+        if self.instrToBeExecuted[0] is not None:
+            instr = self.instrToBeExecuted[0]
+            self.resources_busy[instr.computeResource][0] = instr
             self.resources_busy[instr.computeResource][1] = self.calculateNoComputeCycles(instr)
-            
-            for reg in instr.src_regs["Scalar"]:
-                self.busyBoard["scalar"][reg] = True
-            for reg in instr.src_regs["Vector"]:
-                self.busyBoard["vector"][reg] = True
-            for reg in instr.dst_regs["Scalar"]:
-                self.busyBoard["scalar"][reg] = True
-            for reg in instr.dst_regs["Vector"]:
-                self.busyBoard["vector"][reg] = True
+            print(self.resources_busy[instr.computeResource][1])
         
         return
     
@@ -511,7 +514,7 @@ class Core():
             # incrementing cycle count
             cycleCount += 1
             
-    def memory(self,instr):
+    def memory(self):
         # decrement all counters if not zero
 
         #if(the resource ka value is not busy; 
@@ -520,42 +523,55 @@ class Core():
             # set countdown values
         #else: # decrement the countdown
         # update busyboard too 
-        if self.resources_busy["Memory"][0] == True and self.resources_busy["Memory"][1] > 0:
+        
+        if self.resources_busy["Memory"][0] is not None and self.resources_busy["Memory"][1] > 0:
             self.resources_busy["Memory"][1] -= 1
-        elif self.resources_busy["Memory"][0] == True and self.resources_busy["Memory"][1] <= 0:
-            self.resources_busy["Memory"][0] = False
+        elif self.resources_busy["Memory"][0] is not None and self.resources_busy["Memory"][1] <= 0:
+            
+            for reg in self.resources_busy["Memory"][0].src_regs["Scalar"]:
+                self.busyBoard["scalar"][reg] = False
+            for reg in self.resources_busy["Memory"][0].src_regs["Vector"]:
+                self.busyBoard["vector"][reg] = False
+            for reg in self.resources_busy["Memory"][0].dst_regs["Scalar"]:
+                self.busyBoard["scalar"][reg] = False
+            for reg in self.resources_busy["Memory"][0].dst_regs["Vector"]:
+                self.busyBoard["vector"][reg] = False
+            
+            
+            self.resources_busy["Memory"][0] = None
             self.resources_busy["Memory"][1] = 0
         else:
-            self.resources_busy["Memory"][0] = True
-            self.resources_busy["Memory"][1] = self.calculateNoMemoryCycles(instr)
-            for reg in instr.src_regs["Scalar"]:
-                self.busyBoard["scalar"][reg] = True
-            for reg in instr.src_regs["Vector"]:
-                self.busyBoard["vector"][reg] = True
-            for reg in instr.dst_regs["Scalar"]:
-                self.busyBoard["scalar"][reg] = True
-            for reg in instr.dst_regs["Vector"]:
-                self.busyBoard["vector"][reg] = True
+            if self.instrToBeExecuted[1] is not None:
+                instr = self.instrToBeExecuted[1]
+                self.resources_busy["Memory"][0] = instr
+                self.resources_busy["Memory"][1] = self.calculateNoMemoryCycles(instr)
+                print(self.resources_busy["Memory"][1])
+                for reg in instr.src_regs["Scalar"]:
+                    self.busyBoard["scalar"][reg] = True
+                for reg in instr.src_regs["Vector"]:
+                    self.busyBoard["vector"][reg] = True
+                for reg in instr.dst_regs["Scalar"]:
+                    self.busyBoard["scalar"][reg] = True
+                for reg in instr.dst_regs["Vector"]:
+                    self.busyBoard["vector"][reg] = True
         
         return
     
-    def scalar(self, instr):
-        if self.resources_busy["Scalar"][0] == True and self.resources_busy["Scalar"][1] > 0:
-            self.resources_busy["Scalar"][1] -= 1
-        elif self.resources_busy["Scalar"][0] == True and self.resources_busy["Scalar"][1] <= 0:
-            self.resources_busy["Scalar"][0] = False
-            self.resources_busy["Scalar"][1] = 0
-        else:
-            self.resources_busy["Scalar"][0] = True
-            self.resources_busy["Scalar"][1] = 1
+    def scalar(self):
+
+        if self.instrToBeExecuted[2] is not None:
+            instr = self.instrToBeExecuted[2]
+            #self.resources_busy["Scalar"][0] = instr
+            #self.resources_busy["Scalar"][1] = 1
+
             for reg in instr.src_regs["Scalar"]:
-                self.busyBoard["scalar"][reg] = True
+                self.busyBoard["scalar"][reg] = False
             for reg in instr.src_regs["Vector"]:
-                self.busyBoard["vector"][reg] = True
+                self.busyBoard["vector"][reg] = False
             for reg in instr.dst_regs["Scalar"]:
-                self.busyBoard["scalar"][reg] = True
+                self.busyBoard["scalar"][reg] = False
             for reg in instr.dst_regs["Vector"]:
-                self.busyBoard["vector"][reg] = True
+                self.busyBoard["vector"][reg] = False
         
         return
 
@@ -565,11 +581,30 @@ class Core():
         self.CycleCount = 0
 
         while(True):
+            print("----------------------------------------------------")
+            print("Cycle Number:",self.CycleCount)
 
             #Compute stage; decrement compute counter
-            if self.instrToBeExecuted[0] is not None: self.compute(self.instrToBeExecuted[0])
-            if self.instrToBeExecuted[1] is not None: self.memory(self.instrToBeExecuted[1])
-            if self.instrToBeExecuted[2] is not None: self.scalar(self.instrToBeExecuted[2])
+            
+            print("instructions to be executed: [",end="")
+            if self.instrToBeExecuted[0] is not None: 
+                print(self.instrToBeExecuted[0].instr_name,
+                      ",",self.instrToBeExecuted[0].dst_regs,
+                      end=" ")
+            else: print("None,",end=" ")
+            if self.instrToBeExecuted[1] is not None: 
+                print(self.instrToBeExecuted[1].instr_name,
+                      ",",self.instrToBeExecuted[1].dst_regs,
+                      end=" ")
+            else: print("None,",end=" ")
+            if self.instrToBeExecuted[2] is not None: 
+                print(self.instrToBeExecuted[2].instr_name,
+                      ",",self.instrToBeExecuted[2].dst_regs)
+            else: print("None]")
+            
+            self.compute()
+            self.memory()
+            self.scalar()
             # do for memory and scalar too
 
             # Send to Compute
@@ -578,41 +613,71 @@ class Core():
             self.instrToBeExecuted = self.sendToResources(queue_status)
 
             # Decode and SendToQueue
-            print("length of decode input")
-            print(len(self.decode_input))
             if len(self.decode_input)>0:
-                print("Decoding...")
+                print("\nDecoding",self.decode_input)
                 self.instrToBeQueued = self.decode(self.decode_input)
                 if self.instrToBeQueued == -1: break
                 addToQueue = self.CheckQueue(self.instrToBeQueued) # checks busyboard and if queues are full
+                
                 print("addToQueue:",addToQueue)
+                
+                
+                
                 if addToQueue:
                     self.sendToQueue(self.instrToBeQueued)
+                    self.nop["Fetch"] = False
                 else: # set NOPS
                     self.nop["Fetch"] = True
 
             #print(self.queues)
 
             # Fetch
-            print(self.PC, self.decode_input)
             if not self.nop["Fetch"]:
-                print("fetching...")
                 self.decode_input = self.IMEM.Read(self.PC)
                 if self.decode_input == -1: break
-                print(self.PC, self.decode_input)
+                print("\nfetch from PC =", self.PC, "instr:", self.decode_input)
                 self.PC = self.PC + 1
 
             self.CycleCount+=1
 
-            if self.CycleCount == 100:
-                return self.CycleCount
+            print("\nbusyboards:")
+            print("scalar:",self.busyBoard["scalar"])
+            print("vector:",self.busyBoard["vector"])
+
+            print("\nQueues:")
+            print("Compute Queue: [",end="")
+            for i in range(len(self.queues["vectorCompute"])):
+                print("[",self.queues["vectorCompute"][i].instr_name,end =",")
+                print(self.queues["vectorCompute"][i].dst_regs,"]",end =",")
+            print("]")
+
+            print("Memory Queue: [",end ="")
+            for i in range(len(self.queues["vectorData"])):
+                print("[",self.queues["vectorData"][i].instr_name,end =",")
+                print(self.queues["vectorData"][i].dst_regs,"]",end =",")
+            print("]")
+
+            print("Scalar Queue: [",end ="")
+            for i in range(len(self.queues["scalarOps"])):
+                print("[",self.queues["scalarOps"][i].instr_name,end =",")
+                print(self.queues["scalarOps"][i].dst_regs,"]",end =",")
+            print("]")
+
+            print("\nResources:")
+            print(self.resources_busy)
+
+            #if self.CycleCount == 1005: return self.CycleCount
             
             endCondition = True
             for resource in self.resources_busy:
-                if self.resources_busy[resource][0]: endCondition = False
+                if self.resources_busy[resource][0] is not None: endCondition = False
             for queue in self.queues:
                 if len(self.queues[queue])>0: endCondition = False
-            if len(self.decode_input) > 0: endCondition = False
+            if len(self.decode_input) > 0 and self.decode_input != ["HALT"]: endCondition = False
+            for elem in self.busyBoard["scalar"]: 
+                if elem == True: endCondition = False
+            for elem in self.busyBoard["vector"]: 
+                if elem == True: endCondition = False
             if endCondition == True: 
                 print("ending")
                 return self.CycleCount
@@ -621,7 +686,7 @@ class Core():
         for rf in self.RFs.values():
             rf.dump(iodir)
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
     #parse arguments for input file location
     parser = argparse.ArgumentParser(description='Vector Core Functional Simulator')
     parser.add_argument('--iodir', default="", type=str, help='Path to the folder containing the input files - instructions and data.')

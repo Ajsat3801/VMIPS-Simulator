@@ -1312,6 +1312,7 @@ class Core():
             # break # Replace this line with your code.
             #read
             instr_list = self.IMEM.Read(self.PC)
+            print(self.PC,instr_list)
 
             if instr_list:
                 if instr_list[0] == "HALT": 
