@@ -5,7 +5,7 @@ computeQueueDepth = 4
 # VDMEM LS parameters
 vdmNumBanks = 16
 vlsPipelineDepth = 11
-vdmBankBusyTime = 2
+vdmBankBusyTime = 6
 
 # Compute Pipeline parameters
 numLanes = 4

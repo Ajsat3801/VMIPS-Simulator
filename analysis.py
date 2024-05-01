@@ -47,9 +47,11 @@ config = Config(iodir)
 imem = IMEM(iodir)  
 
 
-vcore = Core(imem, config)
-cycles = vcore.run()
-    
+for i in range(7):
+    parameter = pow(2,i)
+    config.parameters["vdmNumBanks"] = parameter
+    vcore = Core(imem, config)
+    cycles = vcore.run()
+    print("cycles taken when parameter is",parameter,":",cycles)
 
 print("\nTiming Simulator complete")
-print("Total Cycles taken:",cycles)
