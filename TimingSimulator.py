@@ -10,7 +10,7 @@ class Config(object):
             with open(self.filepath, 'r') as conf:
                 self.parameters = {line.split('=')[0].strip(): int(line.split('=')[1].split('#')[0].strip()) for line in conf.readlines() if not (line.startswith('#') or line.strip() == '')}
             print("Config - Parameters loaded from file:", self.filepath)
-            print("Config parameters:", self.parameters)
+            #print("Config parameters:", self.parameters)
         except:
             print("Config - ERROR: Couldn't open file in path:", self.filepath)
             raise
@@ -36,72 +36,6 @@ class IMEM(object):
         #else:
             #print("IMEM - ERROR: Invalid memory access at index: ", idx, " with memory size: ", self.size)
             #return -1
-
-class DMEM(object):
-    # Word addressible - each address contains 32 bits.
-    def __init__(self, name, iodir, addressLen):
-        self.name = name
-        self.size = pow(2, addressLen)
-        self.min_value  = -pow(2, 31)
-        self.max_value  = pow(2, 31) - 1
-        self.ipfilepath = os.path.abspath(os.path.join(iodir, name + ".txt"))
-        self.opfilepath = os.path.abspath(os.path.join(iodir, name + "OP.txt"))
-        self.data = []
-
-        try:
-            with open(self.ipfilepath, 'r') as ipf:
-                self.data = [int(line.strip()) for line in ipf.readlines()]
-            print(self.name, "- Data loaded from file:", self.ipfilepath)
-            # print(self.name, "- Data:", self.data)
-            self.data.extend([0x0 for i in range(self.size - len(self.data))])
-        except:
-            print(self.name, "- ERROR: Couldn't open input file in path:", self.ipfilepath)
-            raise
-
-    def Read(self, idx): # Use this to read from DMEM.
-        pass # Replace this line with your code here.
-
-    def Write(self, idx, val): # Use this to write into DMEM.
-        pass # Replace this line with your code here.
-
-    def dump(self):
-        try:
-            with open(self.opfilepath, 'w') as opf:
-                lines = [str(data) + '\n' for data in self.data]
-                opf.writelines(lines)
-            print(self.name, "- Dumped data into output file in path:", self.opfilepath)
-        except:
-            print(self.name, "- ERROR: Couldn't open output file in path:", self.opfilepath)
-            raise
-
-class RegisterFile(object):
-    def __init__(self, name, count, length = 1, size = 32):
-        self.name       = name
-        self.reg_count  = count
-        self.vec_length = length # Number of 32 bit words in a register.
-        self.reg_bits   = size
-        self.min_value  = -pow(2, self.reg_bits-1)
-        self.max_value  = pow(2, self.reg_bits-1) - 1
-        self.registers  = [[0x0 for e in range(self.vec_length)] for r in range(self.reg_count)] # list of lists of integers
-
-    def Read(self, idx):
-        pass # Replace this line with your code.
-
-    def Write(self, idx, val):
-        pass # Replace this line with your code.
-
-    def dump(self, iodir):
-        opfilepath = os.path.abspath(os.path.join(iodir, self.name + ".txt"))
-        try:
-            with open(opfilepath, 'w') as opf:
-                row_format = "{:<13}"*self.vec_length
-                lines = [row_format.format(*[str(i) for i in range(self.vec_length)]) + "\n", '-'*(self.vec_length*13) + "\n"]
-                lines += [row_format.format(*[str(val) for val in data]) + "\n" for data in self.registers]
-                opf.writelines(lines)
-            print(self.name, "- Dumped data into output file in path:", opfilepath)
-        except:
-            print(self.name, "- ERROR: Couldn't open output file in path:", opfilepath)
-            raise
 
 class instruction():
     def __init__(self,instr_name,instr_queue,src_regs,dst_regs,smem_ad,vmem_ad,
@@ -133,23 +67,14 @@ class instruction():
         self.computeResource = ""
 
 class Core():
-    def __init__(self, imem, sdmem, vdmem, config):
+    def __init__(self, imem, config):
         self.IMEM = imem
-        self.SDMEM = sdmem
-        self.VDMEM = vdmem
         self.config = config
         self.PC = 0
         self.VLR = 0
         self.VMR = [1]*64
-
-        self.RFs = {"SRF": RegisterFile("SRF", 8),      # 8 registers of 32 bit integers
-                    "VRF": RegisterFile("VRF", 8, 64),  # 8 registers of 64 elements; each of 32 bits
-                    "VMR": RegisterFile("VMR", 1, 64),
-                    "VLR": RegisterFile("VLR", 1)
-                }
-        
+       
         self.busyBoard = {"scalar": [False]*8,"vector": [False]*8}
-        print(self.config.parameters)
 
         self.queues = {"vectorCompute":[],
                        "vectorData":[],
@@ -168,18 +93,11 @@ class Core():
                                "Memory":[None,0],
                                "Scalar": [None, 0]
                               }
-        self.banks_busy = [[False,0]]*config.parameters["vdmNumBanks"]
+        self.banks_busy = [[False,0]]*self.config.parameters["vdmNumBanks"]
         
-        self.nop = {"Fetch":False,
-                      "Decode":True,
-                      "SendToCompute":True}
+        self.nop = {"Fetch":False,"Decode":True,"SendToCompute":True}
                 
-        # Your code here.
-
-        # Execute functions here
-
-        # Decode functions here 
-    
+        
     def decode(self,instr_list):
         """
         Function to convert the instruction in a list format and creates an 
@@ -411,18 +329,18 @@ class Core():
     
     def calculateNoComputeCycles(self,instr):
         # Requires Discussion
-        lanes = [0]*config.parameters["numLanes"]
+        lanes = [0]*self.config.parameters["numLanes"]
         for i in range(instr.vectorLength):
-            lanes[i%config.parameters["numLanes"]] += instr.vectorMask[i]
+            lanes[i%self.config.parameters["numLanes"]] += instr.vectorMask[i]
 
         if instr.computeResource == "Adder":
-            cycleCount = config.parameters["pipelineDepthAdd"] + max(lanes) - 1 
+            cycleCount = self.config.parameters["pipelineDepthAdd"] + max(lanes) - 1 
         elif instr.computeResource == "Multiplier":
-            cycleCount = config.parameters["pipelineDepthMul"] + max(lanes) - 1 
+            cycleCount = self.config.parameters["pipelineDepthMul"] + max(lanes) - 1 
         elif instr.computeResource == "Divider":
-            cycleCount = config.parameters["pipelineDepthDiv"] + max(lanes) - 1 
+            cycleCount = self.config.parameters["pipelineDepthDiv"] + max(lanes) - 1 
         elif instr.computeResource == "Shuffle":
-            cycleCount = config.parameters["pipelineDepthShuffle"] + max(lanes) - 1 
+            cycleCount = self.config.parameters["pipelineDepthShuffle"] + max(lanes) - 1 
 
         return cycleCount
     
@@ -434,9 +352,8 @@ class Core():
             if self.resources_busy[resource][0] is not None:
                 if self.resources_busy[resource][1] > 0:
                     self.resources_busy[resource][1] -= 1
-                    print(self.resources_busy[resource][1])
+                    #print(self.resources_busy[resource][1])
                 else:
-                    print("inside else condition")
                     for reg in self.resources_busy[resource][0].src_regs["Scalar"]:
                         self.busyBoard["scalar"][reg] = False
                     for reg in self.resources_busy[resource][0].src_regs["Vector"]:
@@ -453,22 +370,22 @@ class Core():
             instr = self.instrToBeExecuted[0]
             self.resources_busy[instr.computeResource][0] = instr
             self.resources_busy[instr.computeResource][1] = self.calculateNoComputeCycles(instr)
-            print(self.resources_busy[instr.computeResource][1])
+            #print(self.resources_busy[instr.computeResource][1])
         
         return
     
     def calculateNoMemoryCycles(self,instr):
-        # Requires Discussion
+        
         # calculate number of cycles to be taken in memory by simulating it
 
         # creating the queues for each lane:
-        vls_pipelines = [[]] * config.parameters["numLanes"]
+        vls_pipelines = [[]] * self.config.parameters["numLanes"]
         # assigning each memory access to a queue
         for i in range(instr.vectorLength):
             if instr.vmem_ad[i] == -1:
                 continue
             else:
-                vls_pipelines[i % config.parameters["numLanes"]].append(instr.vmem_ad[i])
+                vls_pipelines[i % self.config.parameters["numLanes"]].append(instr.vmem_ad[i])
         
         # now we simulate all the memory accesses, and calculate the number of cycles to execute this instruction
         # to calculate which bank it should access, we mod the address by the number of banks
@@ -499,13 +416,13 @@ class Core():
                     # let's look at the head of the queue and check which bank we should send the address to:
                     mem_addr = int(each_lane[0])
                     # print(type(mem_addr))
-                    bank_idx = mem_addr % config.parameters["vdmNumBanks"]
+                    bank_idx = mem_addr % self.config.parameters["vdmNumBanks"]
 
                     # let's check that bank: if it isn't busy, we dispatch our request. else, do nothing.
                     if self.banks_busy[bank_idx][0] == False:
                         each_lane.pop(0)
                         self.banks_busy[bank_idx][0] = True
-                        self.banks_busy[bank_idx][1] = config.parameters["vdmBankBusyTime"]
+                        self.banks_busy[bank_idx][1] = self.config.parameters["vdmBankBusyTime"]
 
             # termination condition
             if all_lanes_free and all_banks_free:
@@ -545,7 +462,7 @@ class Core():
                 instr = self.instrToBeExecuted[1]
                 self.resources_busy["Memory"][0] = instr
                 self.resources_busy["Memory"][1] = self.calculateNoMemoryCycles(instr)
-                print(self.resources_busy["Memory"][1])
+                
                 for reg in instr.src_regs["Scalar"]:
                     self.busyBoard["scalar"][reg] = True
                 for reg in instr.src_regs["Vector"]:
@@ -561,8 +478,6 @@ class Core():
 
         if self.instrToBeExecuted[2] is not None:
             instr = self.instrToBeExecuted[2]
-            #self.resources_busy["Scalar"][0] = instr
-            #self.resources_busy["Scalar"][1] = 1
 
             for reg in instr.src_regs["Scalar"]:
                 self.busyBoard["scalar"][reg] = False
@@ -581,6 +496,8 @@ class Core():
         self.CycleCount = 0
 
         while(True):
+            
+            """
             print("----------------------------------------------------")
             print("Cycle Number:",self.CycleCount)
 
@@ -601,27 +518,21 @@ class Core():
                 print(self.instrToBeExecuted[2].instr_name,
                       ",",self.instrToBeExecuted[2].dst_regs)
             else: print("None]")
+            """
             
             self.compute()
             self.memory()
             self.scalar()
-            # do for memory and scalar too
-
-            # Send to Compute
             
             queue_status = self.checkResources() # Returns list of booleans
             self.instrToBeExecuted = self.sendToResources(queue_status)
 
             # Decode and SendToQueue
             if len(self.decode_input)>0:
-                print("\nDecoding",self.decode_input)
+                #print("\nDecoding",self.decode_input)
                 self.instrToBeQueued = self.decode(self.decode_input)
                 if self.instrToBeQueued == -1: break
                 addToQueue = self.CheckQueue(self.instrToBeQueued) # checks busyboard and if queues are full
-                
-                print("addToQueue:",addToQueue)
-                
-                
                 
                 if addToQueue:
                     self.sendToQueue(self.instrToBeQueued)
@@ -629,23 +540,22 @@ class Core():
                 else: # set NOPS
                     self.nop["Fetch"] = True
 
-            #print(self.queues)
-
             # Fetch
             if not self.nop["Fetch"]:
                 self.decode_input = self.IMEM.Read(self.PC)
                 if self.decode_input == -1: break
-                print("\nfetch from PC =", self.PC, "instr:", self.decode_input)
+                #print("\nfetch from PC =", self.PC, "instr:", self.decode_input)
                 self.PC = self.PC + 1
 
             self.CycleCount+=1
 
-            print("\nbusyboards:")
-            print("scalar:",self.busyBoard["scalar"])
-            print("vector:",self.busyBoard["vector"])
+            """
+            #print("\nbusyboards:")
+            #print("scalar:",self.busyBoard["scalar"])
+            #print("vector:",self.busyBoard["vector"])
 
-            print("\nQueues:")
-            print("Compute Queue: [",end="")
+            #print("\nQueues:")
+            #print("Compute Queue: [",end="")
             for i in range(len(self.queues["vectorCompute"])):
                 print("[",self.queues["vectorCompute"][i].instr_name,end =",")
                 print(self.queues["vectorCompute"][i].dst_regs,"]",end =",")
@@ -665,9 +575,8 @@ class Core():
 
             print("\nResources:")
             print(self.resources_busy)
+            """
 
-            #if self.CycleCount == 1005: return self.CycleCount
-            
             endCondition = True
             for resource in self.resources_busy:
                 if self.resources_busy[resource][0] is not None: endCondition = False
@@ -679,16 +588,12 @@ class Core():
             for elem in self.busyBoard["vector"]: 
                 if elem == True: endCondition = False
             if endCondition == True: 
-                print("ending")
+                #print("ending")
                 return self.CycleCount
-
-    def dumpregs(self, iodir):
-        for rf in self.RFs.values():
-            rf.dump(iodir)
 
 if __name__ == "__main__": 
     #parse arguments for input file location
-    parser = argparse.ArgumentParser(description='Vector Core Functional Simulator')
+    parser = argparse.ArgumentParser(description='Vector Core Timing Simulator')
     parser.add_argument('--iodir', default="", type=str, help='Path to the folder containing the input files - instructions and data.')
     args = parser.parse_args()
 
@@ -700,22 +605,13 @@ if __name__ == "__main__":
 
     # Parse IMEM
     imem = IMEM(iodir)  
-    # Parse SMEM
-    sdmem = DMEM("SDMEM", iodir, 13) # 32 KB is 2^15 bytes = 2^13 K 32-bit words.
-    # Parse VMEM
-    vdmem = DMEM("VDMEM", iodir, 17) # 512 KB is 2^19 bytes = 2^17 K 32-bit words. 
 
     # Create Vector Core
-    vcore = Core(imem, sdmem, vdmem, config)
+    vcore = Core(imem, config)
 
     # Run Core
     cycles = vcore.run()
     print(cycles)
-    vcore.dumpregs(iodir)
-
-    sdmem.dump()
-    vdmem.dump()
-
     print("END")
 
     # THE END

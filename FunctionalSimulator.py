@@ -1,7 +1,7 @@
 import os
 import argparse
 
-class IMEM(object):
+class IMEM_func(object):
     def __init__(self, iodir):
         self.size = pow(2, 16) # Can hold a maximum of 2^16 instructions.
         self.filepath = os.path.abspath(os.path.join(iodir, "Code.asm"))
@@ -44,7 +44,7 @@ class IMEM(object):
         except:
             print("ERROR: Couldn't dump unrolled instructions output file in path:", self.opfilepath)
 
-class DMEM(object):
+class DMEM_func(object):
     # Word addressible - each address contains 32 bits.
     def __init__(self, name, iodir, addressLen):
         self.name = name
@@ -89,7 +89,7 @@ class DMEM(object):
         except:
             print(self.name, "- ERROR: Couldn't open output file in path:", self.opfilepath)
 
-class RegisterFile(object):
+class RegisterFile_func(object):
     def __init__(self, name, count, length = 1, size = 32):
         self.name       = name
         self.reg_count  = count         # Number of registers
@@ -158,17 +158,17 @@ class RegisterFile(object):
         except:
             print(self.name, "- ERROR: Couldn't open output file in path:", opfilepath)
 
-class Core():
+class Core_func():
     def __init__(self, imem, sdmem, vdmem):
         self.IMEM = imem
         self.SDMEM = sdmem
         self.VDMEM = vdmem
         self.PC = 0
 
-        self.RFs = {"SRF": RegisterFile("SRF", 8),      # 8 registers of 32 bit integers
-                    "VRF": RegisterFile("VRF", 8, 64),  # 8 registers of 64 elements; each of 32 bits
-                    "VMR": RegisterFile("VMR", 1, 64),
-                    "VLR": RegisterFile("VLR", 1)
+        self.RFs = {"SRF": RegisterFile_func("SRF", 8),      # 8 registers of 32 bit integers
+                    "VRF": RegisterFile_func("VRF", 8, 64),  # 8 registers of 64 elements; each of 32 bits
+                    "VMR": RegisterFile_func("VMR", 1, 64),
+                    "VLR": RegisterFile_func("VLR", 1)
                 }  
         
         # Your code here.returVV
@@ -1312,7 +1312,7 @@ class Core():
             # break # Replace this line with your code.
             #read
             instr_list = self.IMEM.Read(self.PC)
-            print(self.PC,instr_list)
+            #print(self.PC,instr_list)
 
             if instr_list:
                 if instr_list[0] == "HALT": 
@@ -1344,14 +1344,14 @@ if __name__ == "__main__":
     print("IO Directory:", iodir)
 
     # Parse IMEM
-    imem = IMEM(iodir)  
+    imem = IMEM_func(iodir)  
     # Parse SMEM
-    sdmem = DMEM("SDMEM", iodir, 13) # 32 KB is 2^15 bytes = 2^13 K 32-bit words.
+    sdmem = DMEM_func("SDMEM", iodir, 13) # 32 KB is 2^15 bytes = 2^13 K 32-bit words.
     # Parse VMEM
-    vdmem = DMEM("VDMEM", iodir, 17) # 512 KB is 2^19 bytes = 2^17 K 32-bit words. 
+    vdmem = DMEM_func("VDMEM", iodir, 17) # 512 KB is 2^19 bytes = 2^17 K 32-bit words. 
 
     # Create Vector Core
-    vcore = Core(imem, sdmem, vdmem)
+    vcore = Core_func(imem, sdmem, vdmem)
 
     # Run Core
     vcore.run()   
