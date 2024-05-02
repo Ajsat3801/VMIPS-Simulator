@@ -345,7 +345,7 @@ class Core():
         return cycleCount
     
     def compute(self):
-        
+    
         # decrement all counters if not zero
         keys = list(self.resources_busy.keys())
         for resource in keys[:-2]:
@@ -486,11 +486,15 @@ class Core():
 
         while(True):
             
+            # These functions run every cycle, decrementing the cycle countdown of instructions 
+            # are still executing, and updating the busyboard/freeing the resources once they are done computing
             self.compute()
             self.memory()
             self.scalar()
             
+            # This function checks which resources are available to dispatch instructions to
             queue_status = self.checkResources() # Returns list of booleans
+            # This instructions dispatches those instructions to their respective resources
             self.instrToBeExecuted = self.sendToResources(queue_status)
 
             # Decode and SendToQueue
@@ -498,14 +502,15 @@ class Core():
                 self.instrToBeQueued = self.decode(self.decode_input)
                 if self.instrToBeQueued == -1: break
                 addToQueue = self.CheckQueue(self.instrToBeQueued) # checks busyboard and if queues are full
-                
+                # This bool check allows us to stall the fetch and decode if the 
+                # queues are full or there is a data dependency
                 if addToQueue:
                     self.sendToQueue(self.instrToBeQueued)
                     self.nop["Fetch"] = False
                 else: # set NOPS
                     self.nop["Fetch"] = True
 
-            # Fetch
+            # Fetch: we stall if decode needs to stall
             if not self.nop["Fetch"]:
                 self.decode_input = self.IMEM.Read(self.PC)
                 if self.decode_input == -1: break

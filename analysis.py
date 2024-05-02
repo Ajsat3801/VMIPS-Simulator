@@ -35,15 +35,6 @@ print("\n Functional simulation complete; generated trace")
 print("------------------------------------------")
 print("Starting Timing Simulator")
 
-#parser = argparse.ArgumentParser(description='Vector Core Timing Simulator')
-#parser.add_argument('--iodir', default="", type=str, help='Path to the folder containing the input files - instructions and data.')
-#args = parser.parse_args()
-
-#iodir = os.path.abspath(args.iodir)
-#print("IO Directory:", iodir)
-
-# Parse Config
-
 imem = IMEM(iodir)  
 
 config_params = ["dataQueueDepth","computeQueueDepth","vdmNumBanks","numLanes","pipelineDepthMul","pipelineDepthAdd","pipelineDepthDiv","pipelineDepthShuffle"]
