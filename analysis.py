@@ -43,15 +43,19 @@ print("Starting Timing Simulator")
 #print("IO Directory:", iodir)
 
 # Parse Config
-config = Config(iodir)
+
 imem = IMEM(iodir)  
 
+config_params = ["dataQueueDepth","computeQueueDepth","vdmNumBanks","numLanes","pipelineDepthMul","pipelineDepthAdd","pipelineDepthDiv","pipelineDepthShuffle"]
 
-for i in range(7):
-    parameter = pow(2,i)
-    config.parameters["vdmNumBanks"] = parameter
-    vcore = Core(imem, config)
-    cycles = vcore.run()
-    print("cycles taken when parameter is",parameter,":",cycles)
+for param in config_params:
+    config = Config(iodir)
+    print("\nfor",param)
+    for i in range(8):
+        parameter = pow(2,i)
+        config.parameters[param] = parameter
+        vcore = Core(imem, config)
+        cycles = vcore.run()
+        print("cycles taken when parameter is",parameter,":",cycles)
 
 print("\nTiming Simulator complete")

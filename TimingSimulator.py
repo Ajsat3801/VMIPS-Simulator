@@ -369,7 +369,7 @@ class Core():
         if self.instrToBeExecuted[0] is not None:
             instr = self.instrToBeExecuted[0]
             self.resources_busy[instr.computeResource][0] = instr
-            self.resources_busy[instr.computeResource][1] = self.calculateNoComputeCycles(instr)
+            self.resources_busy[instr.computeResource][1] = self.calculateNoComputeCycles(instr) -1
             #print(self.resources_busy[instr.computeResource][1])
         
         return
@@ -377,45 +377,36 @@ class Core():
     def calculateNoMemoryCycles(self,instr):
         
         # calculate number of cycles to be taken in memory by simulating it
-
         # creating the queues for each lane:
         vls_pipelines = [[]] * self.config.parameters["numLanes"]
         # assigning each memory access to a queue
         for i in range(instr.vectorLength):
-            if instr.vmem_ad[i] == -1:
-                continue
-            else:
-                vls_pipelines[i % self.config.parameters["numLanes"]].append(instr.vmem_ad[i])
+            if instr.vmem_ad[i] == -1: continue
+            else: vls_pipelines[i % self.config.parameters["numLanes"]].append(instr.vmem_ad[i])
         
         # now we simulate all the memory accesses, and calculate the number of cycles to execute this instruction
         # to calculate which bank it should access, we mod the address by the number of banks
 
-        cycleCount = 0
+        cycleCount = self.config.parameters["vlsPipelineDepth"] - 1
         while True:
 
             # setting checks for if we have finished processing all memory addresses:
             all_lanes_free = True
             all_banks_free = True
             
-            # Let's check all banks
-            # if bank is busy, check countdown. If it is zero, set to bank free. If nonzero, decrement by 1
+            # checking banks; if bank is busy, check countdown. If it is zero, set to bank free. If nonzero, decrement by 1
             for each_bank in self.banks_busy:
                 if each_bank[0] == True:
                     all_banks_free = False
-                    if each_bank[1] == 0:
-                        each_bank[0] = False
-                    else:
-                        each_bank[1] -= 1
+                    if each_bank[1] == 0: each_bank[0] = False
+                    else: each_bank[1] -= 1
 
-            # checking each lane
-            # now we will process each lane in order, automatically giving priority to the lower index
+            # checking each lane; now we will process each lane in order, automatically giving priority to the lower index
             for each_lane in vls_pipelines:
                 if len(each_lane) > 0:
                     all_lanes_free = False
 
-                    # let's look at the head of the queue and check which bank we should send the address to:
-                    mem_addr = int(each_lane[0])
-                    # print(type(mem_addr))
+                    mem_addr = int(each_lane[0]) # let's look at the head of the queue and check which bank we should send the address to:
                     bank_idx = mem_addr % self.config.parameters["vdmNumBanks"]
 
                     # let's check that bank: if it isn't busy, we dispatch our request. else, do nothing.
@@ -424,9 +415,7 @@ class Core():
                         self.banks_busy[bank_idx][0] = True
                         self.banks_busy[bank_idx][1] = self.config.parameters["vdmBankBusyTime"]
 
-            # termination condition
-            if all_lanes_free and all_banks_free:
-                return cycleCount
+            if all_lanes_free and all_banks_free: return cycleCount # termination condition
 
             # incrementing cycle count
             cycleCount += 1
@@ -461,7 +450,7 @@ class Core():
             if self.instrToBeExecuted[1] is not None:
                 instr = self.instrToBeExecuted[1]
                 self.resources_busy["Memory"][0] = instr
-                self.resources_busy["Memory"][1] = self.calculateNoMemoryCycles(instr)
+                self.resources_busy["Memory"][1] = self.calculateNoMemoryCycles(instr) -1 # -1 to prevent a 2 cycle lag
                 
                 for reg in instr.src_regs["Scalar"]:
                     self.busyBoard["scalar"][reg] = True
@@ -497,29 +486,6 @@ class Core():
 
         while(True):
             
-            """
-            print("----------------------------------------------------")
-            print("Cycle Number:",self.CycleCount)
-
-            #Compute stage; decrement compute counter
-            
-            print("instructions to be executed: [",end="")
-            if self.instrToBeExecuted[0] is not None: 
-                print(self.instrToBeExecuted[0].instr_name,
-                      ",",self.instrToBeExecuted[0].dst_regs,
-                      end=" ")
-            else: print("None,",end=" ")
-            if self.instrToBeExecuted[1] is not None: 
-                print(self.instrToBeExecuted[1].instr_name,
-                      ",",self.instrToBeExecuted[1].dst_regs,
-                      end=" ")
-            else: print("None,",end=" ")
-            if self.instrToBeExecuted[2] is not None: 
-                print(self.instrToBeExecuted[2].instr_name,
-                      ",",self.instrToBeExecuted[2].dst_regs)
-            else: print("None]")
-            """
-            
             self.compute()
             self.memory()
             self.scalar()
@@ -529,7 +495,6 @@ class Core():
 
             # Decode and SendToQueue
             if len(self.decode_input)>0:
-                #print("\nDecoding",self.decode_input)
                 self.instrToBeQueued = self.decode(self.decode_input)
                 if self.instrToBeQueued == -1: break
                 addToQueue = self.CheckQueue(self.instrToBeQueued) # checks busyboard and if queues are full
@@ -544,38 +509,9 @@ class Core():
             if not self.nop["Fetch"]:
                 self.decode_input = self.IMEM.Read(self.PC)
                 if self.decode_input == -1: break
-                #print("\nfetch from PC =", self.PC, "instr:", self.decode_input)
                 self.PC = self.PC + 1
 
             self.CycleCount+=1
-
-            """
-            #print("\nbusyboards:")
-            #print("scalar:",self.busyBoard["scalar"])
-            #print("vector:",self.busyBoard["vector"])
-
-            #print("\nQueues:")
-            #print("Compute Queue: [",end="")
-            for i in range(len(self.queues["vectorCompute"])):
-                print("[",self.queues["vectorCompute"][i].instr_name,end =",")
-                print(self.queues["vectorCompute"][i].dst_regs,"]",end =",")
-            print("]")
-
-            print("Memory Queue: [",end ="")
-            for i in range(len(self.queues["vectorData"])):
-                print("[",self.queues["vectorData"][i].instr_name,end =",")
-                print(self.queues["vectorData"][i].dst_regs,"]",end =",")
-            print("]")
-
-            print("Scalar Queue: [",end ="")
-            for i in range(len(self.queues["scalarOps"])):
-                print("[",self.queues["scalarOps"][i].instr_name,end =",")
-                print(self.queues["scalarOps"][i].dst_regs,"]",end =",")
-            print("]")
-
-            print("\nResources:")
-            print(self.resources_busy)
-            """
 
             endCondition = True
             for resource in self.resources_busy:
@@ -587,9 +523,7 @@ class Core():
                 if elem == True: endCondition = False
             for elem in self.busyBoard["vector"]: 
                 if elem == True: endCondition = False
-            if endCondition == True: 
-                #print("ending")
-                return self.CycleCount
+            if endCondition == True: return self.CycleCount
 
 if __name__ == "__main__": 
     #parse arguments for input file location

@@ -1,135 +1,750 @@
-CVM  
+# 544 -> START OF REAL PART OF inputs
+# 672 -> START OF VIRTUAL PART OF inputs
+# 800 -> START OF REAL PART OF TWIDDLE factors
+# 864 -> START OF VIRTUAL PARTS OF TWIDDLE FACTORS
 
-LS SR1 SR0 1 	# = 1; used for incrementing by 1
-LS SR2 SR0 2	#  = 64; used to increment base address of A; also for setting VRL in packhi-packlo
-LS SR3 SR0 3	# = 256 * 64;  used to increment addresses while loading slices of columns
-LS SR4 SR0 0	# Counter for current column number – initial value 0
-LS SR5 SR0 4	# Base address of slice of A – initial value 0
-LS SR6 SR0 7	# Base address of slice of column of W – initial value 0
-LS SR7 SR0 4    # = 256;  used for stride in LVWS for columns
-# Start of Loop
-LS SR2 SR0 2
-MTCL SR2 				# Set VRL as 64
-# ---------------START OF CALCULATIONS----------------
-LS SR5 SR0 4
-LV VR1 SR5              # Load slice of A; start 256
-ADDVV VR4 VR0 VR0
-LVWS VR2 SR6 SR7
+# LOGIC
+# The input vectors are loaded in the order of the leaf nodes in the recursion tree.
+# The input has 2 vectors; 1 for the real part and 1 for complex part
+# The iterations are unrolled and the result of each iteration can be simulated as follows:
+#   The even elements: 
+#       Real        : a_1 + a_2*c + b_2*d
+#       Imaginary   : a_1 - a_2*d - b_2*c
+#   The odd elements:
+#       Real        : b_1 + a_2*d + b_2*c
+#       Imaginary   : b_1 - a_2*d - b_2*c
+ 
+# The above equations are applied when the even input is (a_1 + b_1 j), the odd input is (a_2 + b_2 j) and the twiddle factors are (c + d j)
 
-MULVV  VR3 VR1 VR2
-ADDVV VR4 VR4 VR3
+CVM
+LS SR1 SR0 1
+LS SR2 SR0 12
+LS SR3 SR0 3
+LS SR4 SR0 4
 
-ADD SR5 SR5 SR2
-ADD SR6 SR6 SR3
-# --------- END OF FIRST 64 ELEMENTS -------------------
-LV VR1 SR5
-LVWS VR2 SR6 SR7
+MTCL SR4
 
-MULVV  VR3 VR1 VR2
-ADDVV VR4 VR4 VR3
+LS SR5 SR0 10
+LS SR6 SR0 6
+LS SR7 SR0 11
 
-ADD SR5 SR5 SR2
-ADD SR6 SR6 SR3
-# --------- END OF SECOND 64 ELEMENTS -------------------
-LV VR1 SR5
-LVWS VR2 SR6 SR7
+LV VR4 SR5 # Load index vector for even elements
+LVI VR7 SR6 VR4 # Use LVI to load even elements in order of leaf nodes of recursion tree
 
-MULVV  VR3 VR1 VR2
-ADDVV VR4 VR4 VR3
+# Load VR3, VR4, VR5, VR6
+PACKLO VR3 VR7 VR0      # a_1 is loaded to VR3
+PACKHI VR5 VR7 VR0      # a_2 is loaded to VR5
 
-ADD SR5 SR5 SR2
-ADD SR6 SR6 SR3
-# --------- END OF THIRD 64 ELEMENTS -------------------
-LV VR1 SR5
-LVWS VR2 SR6 SR7
+ADD SR6 SR6 SR4
+ADD SR6 SR6 SR4
 
-MULVV  VR3 VR1 VR2
-ADDVV VR4 VR4 VR3
+LVI VR7 SR6 VR4
+PACKLO VR4 VR7 VR0      # b_1 loaded to VR4
+PACKHI VR6 VR7 VR0      # b_2 loaded to VR6
 
-# --------- END OF LAST 64 ELEMENTS -------------------
+LS SR5 SR0 8
+ADD SR6 SR5 SR4
 
-# VR4 Contains the aggregate dot product that needs to be summed
-# Now VR1 and VR2 will store PACKLO and PACKHI intermediate values
-# Now VR3 will store sum of PACKLO PACKHI as well as the final result of that column
-# SR2 is now used to determine VRL length
-ADDVV VR1 VR0 VR0
-ADDVV VR2 VR0 VR0
-PACKLO VR1 VR4 VR0		# store even elements of result into first half of VR1
-PACKHI VR2 VR4 VR0		# store odd elements of result into first half of VR2
-SRL SR2 SR2 SR1 		# Use right shift to halve the value of SR2 – to 32
-MTCL SR2			    # Use newly halved value into the VRL
-ADDVV VR4 VR1 VR2		# Sum the two halves of the result
+ADDVV VR7 VR0 VR0
 
-PACKLO VR1 VR4 VR0		# store even elements of result into first half of VR1
-PACKHI VR2 VR4 VR0		# store odd elements of result into first half of VR2
-SRL SR2 SR2 SR1 		# Use right shift to halve the value of SR2 – to 16
-MTCL SR2			    # Use newly halved value into the VRL
-ADDVV VR4 VR1 VR2		# Sum the two halves of the result
+# ------------------ FIRST ITERATION (1/6) --------------------------
+MTCL SR3
 
-PACKLO VR1 VR4 VR0		# store even elements of result into first half of VR1
-PACKHI VR2 VR4 VR0		# store odd elements of result into first half of VR2
-SRL SR2 SR2 SR1 		# Use right shift to halve the value of SR2 – to 8
-MTCL SR2			    # Use newly halved value into the VRL
-ADDVV VR4 VR1 VR2		# Sum the two halves of the result
+LV VR7 SR0              # Load index for twiddle factor
+LVI VR1 SR5 VR7         # Load real part of twiddle factors
+LVI VR2 SR6 VR7         # Load virtual parts of twiddle factors
 
-PACKLO VR1 VR4 VR0		# store even elements of result into first half of VR1
-PACKHI VR2 VR4 VR0		# store odd elements of result into first half of VR2
-SRL SR2 SR2 SR1 		# Use right shift to halve the value of SR2 – to 4
-MTCL SR2			    # Use newly halved value into the VRL 
-ADDVV VR4 VR1 VR2		# Sum the two halves of the result
+MULVV VR5 VR5 VR1       # a_2*c
+DIVVS VR5 VR5 SR2       # dividing due to offset 
+MULVV VR6 VR6 VR2       # b_2*d
+DIVVS VR6 VR6 SR2       # dividing due to offset
 
-PACKLO VR1 VR4 VR0		# store even elements of result into first half of VR1
-PACKHI VR2 VR4 VR0		# store odd elements of result into first half of VR2
-SRL SR2 SR2 SR1 		# Use right shift to halve the value of SR2 – to 2
-MTCL SR2			    # Use newly halved value into the VRL
-ADDVV VR4 VR1 VR2		# Sum the two halves of the result
+SUBVV VR7 VR3 VR5       # a_1 - a_2*c
+SUBVV VR7 VR7 VR6       # a_1 - a_2*c - b_2*d (odd elements of the result)
 
-PACKLO VR1 VR4 VR0		# store even elements of result into first half of VR1
-PACKHI VR2 VR4 VR0		# store odd elements of result into first half of VR2
-SRL SR2 SR2 SR1 		# Use right shift to halve the value of SR2 – to 1
-MTCL SR2			    # Use newly halved value into the VRL
-ADDVV VR4 VR1 VR2		# Sum the two halves of the result
+ADDVV VR3 VR3 VR5       # a_1 + a_2*c
+ADDVV VR3 VR3 VR6       # a_1 + a_2*c + b_2*d (even elements of the result)
 
-# Now SR2 + column number is used to determine the VDMEM address for the calculated element
-LS SR2 SR0 0
-ADD SR2 SR2 SR4
-SV VR4 SR2
-ADD SR4 SR4 SR1 		# increment column number; memory address as well 
-LS SR6 SR0 7
-ADD SR6 SR4 SR6 		# SR_Base = column number 
+MTCL SR4
+UNPACKLO VR3 VR3 VR7    # Result of the real part of this iteration
+MTCL SR3
 
-BNE SR7 SR4 -92         # – JUMP TO START OF LOOP
+# Reverting a_2*c and b_2*d due to register constraints
+MULVS VR5 VR5 SR2
+MULVS VR6 VR6 SR2
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
 
-LS SR2 SR0 2            # Set SR2 to 64
-MTCL SR2                # Set VLR to 64
-LS SR3 SR0 5            # Set SR3 to 512
-LS SR6 SR0 0            # Set SR6 to 0
+MULVV VR5 VR5 VR2       # a_2*d
+MULVV VR6 VR6 VR1       # b_2*c
+DIVVS VR5 VR5 SR2       # dividing due to offset 
+DIVVS VR6 VR6 SR2       # dividing due to offset 
 
-LV VR1 SR3              # – this will load vector B from the input VDMEM
-LV VR2 SR6              # – this will load the result vector of a * W from the VDMEM
-ADDVV VR3 VR1 VR2
-SV VR3 SR6              # – storing the final results
+SUBVV VR7 VR4 VR5       # b1 - a_2*d
+SUBVV VR7 VR7 VR6       # b1 - a_2*d - b_2*c (odd elements of the result)
 
-ADD SR3 SR3 SR2
-ADD SR6 SR6 SR2
-LV VR1 SR3              # – this will load vector B from the input VDMEM
-LV VR2 SR6              # – this will load the result vector of a * W from the VDMEM
-ADDVV VR3 VR1 VR2
-SV VR3 SR6              # – storing the final results
+ADDVV VR4 VR4 VR5       # b1 + a_2*d
+ADDVV VR4 VR4 VR6       # b1 + a_2*d - b_2*c (even elements of the result)
 
-ADD SR3 SR3 SR2
-ADD SR6 SR6 SR2
-LV VR1 SR3              # – this will load vector B from the input VDMEM
-LV VR2 SR6              # – this will load the result vector of a * W from the VDMEM
-ADDVV VR3 VR1 VR2
-SV VR3 SR6              # – storing the final results
+MTCL SR4
+UNPACKLO VR4 VR4 VR7    # Result of the virtual part of this iteration
 
-ADD SR3 SR3 SR2
-ADD SR6 SR6 SR2
-LV VR1 SR3              # – this will load vector B from the input VDMEM
-LV VR2 SR6              # – this will load the result vector of a * W from the VDMEM
-ADDVV VR3 VR1 VR2
-SV VR3 SR6              # – storing the final results
+# Load VR3, VR4, VR5, VR6 for next iteration
+ADDVV VR7 VR3 VR0
+PACKLO VR3 VR7 VR0
+PACKHI VR5 VR7 VR0
 
+ADDVV VR7 VR4 VR0
+PACKLO VR4 VR7 VR0
+PACKHI VR6 VR7 VR0
+
+# -------------------- 2ND ITERATION (2/6) ------------------
+
+MTCL SR3
+
+LV VR7 SR7                # Load index for twiddle factor
+LVI VR1 SR5 VR7         # Load real part of twiddle factors
+LVI VR2 SR6 VR7         # Load virtual parts of twiddle factors
+
+MULVV VR5 VR5 VR1
+DIVVS VR5 VR5 SR2
+MULVV VR6 VR6 VR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR3 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR3 VR3 VR5
+ADDVV VR3 VR3 VR6
+
+MTCL SR4
+UNPACKLO VR3 VR3 VR7    # Result of the real part of this iteration
+MTCL SR3
+
+MULVS VR5 VR5 SR2
+MULVS VR6 VR6 SR2
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
+
+MULVV VR5 VR5 VR2
+MULVV VR6 VR6 VR1
+DIVVS VR5 VR5 SR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR4 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR4 VR4 VR5
+ADDVV VR4 VR4 VR6
+
+MTCL SR4
+UNPACKLO VR4 VR4 VR7    # Result of the virtual part of this iteration
+
+# Load VR3, VR4, VR5, VR6 for next iteration
+
+ADDVV VR7 VR3 VR0
+PACKLO VR3 VR7 VR0
+PACKHI VR5 VR7 VR0
+
+ADDVV VR7 VR4 VR0
+PACKLO VR4 VR7 VR0
+PACKHI VR6 VR7 VR0
+
+# -------------------- 3RD ITERATION (3/6) ------------------
+
+MTCL SR3
+
+SUB SR7 SR7 SR3
+LV VR7 SR7              # Load index for twiddle factor
+LVI VR1 SR5 VR7         # Load real part of twiddle factors
+LVI VR2 SR6 VR7         # Load virtual parts of twiddle factors
+
+MULVV VR5 VR5 VR1
+DIVVS VR5 VR5 SR2
+MULVV VR6 VR6 VR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR3 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR3 VR3 VR5
+ADDVV VR3 VR3 VR6
+
+MTCL SR4
+UNPACKLO VR3 VR3 VR7    # Result of the real part of this iteration
+MTCL SR3
+
+MULVS VR5 VR5 SR2
+MULVS VR6 VR6 SR2
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
+
+MULVV VR5 VR5 VR2
+MULVV VR6 VR6 VR1
+DIVVS VR5 VR5 SR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR4 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR4 VR4 VR5
+ADDVV VR4 VR4 VR6
+
+MTCL SR4
+UNPACKLO VR4 VR4 VR7    # Result of the virtual part of this iteration
+
+# Load VR3, VR4, VR5, VR6 for next iteration
+
+ADDVV VR7 VR3 VR0
+PACKLO VR3 VR7 VR0
+PACKHI VR5 VR7 VR0
+
+ADDVV VR7 VR4 VR0
+PACKLO VR4 VR7 VR0
+PACKHI VR6 VR7 VR0
+
+# -------------------- 4th ITERATION (4/6) ------------------
+
+MTCL SR3
+
+SUB SR7 SR7 SR3
+LV VR7 SR7              # Load index for twiddle factor
+LVI VR1 SR5 VR7         # Load real part of twiddle factors
+LVI VR2 SR6 VR7         # Load virtual parts of twiddle factors
+
+MULVV VR5 VR5 VR1
+DIVVS VR5 VR5 SR2
+MULVV VR6 VR6 VR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR3 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR3 VR3 VR5
+ADDVV VR3 VR3 VR6
+
+MTCL SR4
+UNPACKLO VR3 VR3 VR7    # Result of the real part of this iteration
+MTCL SR3
+
+MULVS VR5 VR5 SR2
+MULVS VR6 VR6 SR2
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
+
+MULVV VR5 VR5 VR2
+MULVV VR6 VR6 VR1
+DIVVS VR5 VR5 SR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR4 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR4 VR4 VR5
+ADDVV VR4 VR4 VR6
+
+MTCL SR4
+UNPACKLO VR4 VR4 VR7    # Result of the virtual part of this iteration
+
+# Load VR3, VR4, VR5, VR6 for next iteration
+
+ADDVV VR7 VR3 VR0
+PACKLO VR3 VR7 VR0
+PACKHI VR5 VR7 VR0
+
+ADDVV VR7 VR4 VR0
+PACKLO VR4 VR7 VR0
+PACKHI VR6 VR7 VR0
+
+# -------------------- 5th ITERATION (5/6) ------------------
+
+MTCL SR3
+
+SUB SR7 SR7 SR3
+LV VR7 SR7              # Load index for twiddle factor
+LVI VR1 SR5 VR7         # Load real part of twiddle factors
+LVI VR2 SR6 VR7         # Load virtual parts of twiddle factors
+
+MULVV VR5 VR5 VR1
+DIVVS VR5 VR5 SR2
+MULVV VR6 VR6 VR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR3 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR3 VR3 VR5
+ADDVV VR3 VR3 VR6
+
+MTCL SR4
+UNPACKLO VR3 VR3 VR7    # Result of the real part of this iteration
+MTCL SR3
+
+MULVS VR5 VR5 SR2
+MULVS VR6 VR6 SR2
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
+
+MULVV VR5 VR5 VR2
+MULVV VR6 VR6 VR1
+DIVVS VR5 VR5 SR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR4 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR4 VR4 VR5
+ADDVV VR4 VR4 VR6
+
+MTCL SR4
+UNPACKLO VR4 VR4 VR7    # Result of the virtual part of this iteration
+
+# Load VR3, VR4, VR5, VR6 for next iteration
+
+ADDVV VR7 VR3 VR0
+PACKLO VR3 VR7 VR0
+PACKHI VR5 VR7 VR0
+
+ADDVV VR7 VR4 VR0
+PACKLO VR4 VR7 VR0
+PACKHI VR6 VR7 VR0
+
+# -------------------- 6th ITERATION (6/6) ------------------
+
+MTCL SR3
+
+SUB SR7 SR7 SR3
+LV VR7 SR7              # Load index for twiddle factor
+LVI VR1 SR5 VR7         # Load real part of twiddle factors
+LVI VR2 SR6 VR7         # Load virtual parts of twiddle factors
+
+MULVV VR5 VR5 VR1
+DIVVS VR5 VR5 SR2
+MULVV VR6 VR6 VR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR3 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR3 VR3 VR5
+ADDVV VR3 VR3 VR6
+
+MTCL SR4
+UNPACKLO VR3 VR3 VR7    # Result of the real part of this iteration
+MTCL SR3
+
+MULVS VR5 VR5 SR2
+MULVS VR6 VR6 SR2
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
+
+MULVV VR5 VR5 VR2
+MULVV VR6 VR6 VR1
+DIVVS VR5 VR5 SR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR4 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR4 VR4 VR5
+ADDVV VR4 VR4 VR6
+
+MTCL SR4
+UNPACKLO VR4 VR4 VR7    # Result of the virtual part of this iteration
+
+# Load VR3, VR4, VR5, VR6 for next iteration
+
+ADD SR4 SR4 SR4
+
+SV VR3 SR0 
+SV VR4 SR4
+
+SUB SR4 SR4 SR3
+SUB SR4 SR4 SR3
+
+LS SR7 SR0 11
+
+# --------------- COMPUTATION COMPLETE FOR EVEN HALF OF INPUT
+
+MTCL SR4
+
+LV VR4 416 # Load index vector for even elements
+LVI VR7 544 VR4 # Use LVI to load even elements in order of leaf nodes of recursion tree
+
+# Load VR3, VR4, VR5, VR6
+PACKLO VR3 VR7 VR0
+PACKHI VR5 VR7 VR0
+
+LS SR7 SR0 7
+
+LVI VR7 SR7 VR4
+PACKLO VR4 VR7 VR0
+PACKHI VR6 VR7 VR0
+
+# ------------------ FIRST ITERATION (1/6) --------------------------
+MTCL SR3
+
+LV VR7 SR4                # Load index for twiddle factor
+LVI VR1 SR5 VR7         # Load real part of twiddle factors
+LVI VR2 SR6 VR7         # Load virtual parts of twiddle factors
+
+MULVV VR5 VR5 VR1
+DIVVS VR5 VR5 SR2
+MULVV VR6 VR6 VR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR3 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR3 VR3 VR5
+ADDVV VR3 VR3 VR6
+
+MTCL SR4
+UNPACKLO VR3 VR3 VR7    # Result of the real part of this iteration
+MTCL SR3
+
+MULVS VR5 VR5 SR2
+MULVS VR6 VR6 SR2
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
+
+MULVV VR5 VR5 VR2
+MULVV VR6 VR6 VR1
+DIVVS VR5 VR5 SR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR4 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR4 VR4 VR5
+ADDVV VR4 VR4 VR6
+
+MTCL SR4
+UNPACKLO VR4 VR4 VR7    # Result of the virtual part of this iteration
+
+# Load VR3, VR4, VR5, VR6 for next iteration
+ADDVV VR7 VR3 VR0
+PACKLO VR3 VR7 VR0
+PACKHI VR5 VR7 VR0
+
+ADDVV VR7 VR4 VR0
+PACKLO VR4 VR7 VR0
+PACKHI VR6 VR7 VR0
+
+# -------------------- 2ND ITERATION (2/6) ------------------
+
+MTCL SR3
+
+LS SR7 SR0 11
+LV VR7 SR7              # Load index for twiddle factor
+LVI VR1 SR5 VR7         # Load real part of twiddle factors
+LVI VR2 SR6 VR7         # Load virtual parts of twiddle factors
+
+MULVV VR5 VR5 VR1
+DIVVS VR5 VR5 SR2
+MULVV VR6 VR6 VR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR3 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR3 VR3 VR5
+ADDVV VR3 VR3 VR6
+
+MTCL SR4
+UNPACKLO VR3 VR3 VR7    # Result of the real part of this iteration
+MTCL SR3
+
+MULVS VR5 VR5 SR2
+MULVS VR6 VR6 SR2
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
+
+MULVV VR5 VR5 VR2
+MULVV VR6 VR6 VR1
+DIVVS VR5 VR5 SR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR4 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR4 VR4 VR5
+ADDVV VR4 VR4 VR6
+
+MTCL SR4
+UNPACKLO VR4 VR4 VR7    # Result of the virtual part of this iteration
+
+# Load VR3, VR4, VR5, VR6 for next iteration
+
+ADDVV VR7 VR3 VR0
+PACKLO VR3 VR7 VR0
+PACKHI VR5 VR7 VR0
+
+ADDVV VR7 VR4 VR0
+PACKLO VR4 VR7 VR0
+PACKHI VR6 VR7 VR0
+
+# -------------------- 3RD ITERATION (3/6) ------------------
+
+MTCL SR3
+
+SUB SR7 SR7 SR3
+LV VR7 SR7              # Load index for twiddle factor
+LVI VR1 SR5 VR7         # Load real part of twiddle factors
+LVI VR2 SR6 VR7         # Load virtual parts of twiddle factors
+
+MULVV VR5 VR5 VR1
+DIVVS VR5 VR5 SR2
+MULVV VR6 VR6 VR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR3 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR3 VR3 VR5
+ADDVV VR3 VR3 VR6
+
+MTCL SR4
+UNPACKLO VR3 VR3 VR7    # Result of the real part of this iteration
+MTCL SR3
+
+MULVS VR5 VR5 SR2
+MULVS VR6 VR6 SR2
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
+
+MULVV VR5 VR5 VR2
+MULVV VR6 VR6 VR1
+DIVVS VR5 VR5 SR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR4 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR4 VR4 VR5
+ADDVV VR4 VR4 VR6
+
+MTCL SR4
+UNPACKLO VR4 VR4 VR7    # Result of the virtual part of this iteration
+
+# Load VR3, VR4, VR5, VR6 for next iteration
+
+ADDVV VR7 VR3 VR0
+PACKLO VR3 VR7 VR0
+PACKHI VR5 VR7 VR0
+
+ADDVV VR7 VR4 VR0
+PACKLO VR4 VR7 VR0
+PACKHI VR6 VR7 VR0
+
+# -------------------- 4th ITERATION (4/6) ------------------
+
+MTCL SR3
+
+SUB SR7 SR7 SR3
+LV VR7 SR7              # Load index for twiddle factor
+LVI VR1 SR5 VR7         # Load real part of twiddle factors
+LVI VR2 SR6 VR7         # Load virtual parts of twiddle factors
+
+MULVV VR5 VR5 VR1
+DIVVS VR5 VR5 SR2
+MULVV VR6 VR6 VR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR3 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR3 VR3 VR5
+ADDVV VR3 VR3 VR6
+
+MTCL SR4
+UNPACKLO VR3 VR3 VR7    # Result of the real part of this iteration
+MTCL SR3
+
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
+
+MULVS VR5 VR5 SR2
+MULVS VR6 VR6 SR2
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
+
+MULVV VR5 VR5 VR2
+MULVV VR6 VR6 VR1
+DIVVS VR5 VR5 SR2
+DIVVS VR6 VR6 SR2
+
+ADDVV VR4 VR4 VR5
+ADDVV VR4 VR4 VR6
+
+MTCL SR4
+UNPACKLO VR4 VR4 VR7    # Result of the virtual part of this iteration
+
+# Load VR3, VR4, VR5, VR6 for next iteration
+
+ADDVV VR7 VR3 VR0
+PACKLO VR3 VR7 VR0
+PACKHI VR5 VR7 VR0
+
+ADDVV VR7 VR4 VR0
+PACKLO VR4 VR7 VR0
+PACKHI VR6 VR7 VR0
+
+# -------------------- 5th ITERATION (5/6) ------------------
+
+MTCL SR3
+
+SUB SR7 SR7 SR3
+LV VR7 SR7              # Load index for twiddle factor
+LVI VR1 SR5 VR7         # Load real part of twiddle factors
+LVI VR2 SR6 VR7         # Load virtual parts of twiddle factors
+
+MULVV VR5 VR5 VR1
+DIVVS VR5 VR5 SR2
+MULVV VR6 VR6 VR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR3 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR3 VR3 VR5
+ADDVV VR3 VR3 VR6
+
+MTCL SR4
+UNPACKLO VR3 VR3 VR7    # Result of the real part of this iteration
+MTCL SR3
+
+MULVS VR5 VR5 SR2
+MULVS VR6 VR6 SR2
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
+
+MULVV VR5 VR5 VR2
+MULVV VR6 VR6 VR1
+DIVVS VR5 VR5 SR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR4 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR4 VR4 VR5
+ADDVV VR4 VR4 VR6
+
+MTCL SR4
+UNPACKLO VR4 VR4 VR7    # Result of the virtual part of this iteration
+
+# Load VR3, VR4, VR5, VR6 for next iteration
+
+ADDVV VR7 VR3 VR0
+PACKLO VR3 VR7 VR0
+PACKHI VR5 VR7 VR0
+
+ADDVV VR7 VR4 VR0
+PACKLO VR4 VR7 VR0
+PACKHI VR6 VR7 VR0
+
+# -------------------- 6th ITERATION (6/6) ------------------
+
+MTCL SR3
+
+SUB SR7 SR7 SR3
+LV VR7 SR7              # Load index for twiddle factor
+LVI VR1 SR5 VR7         # Load real part of twiddle factors
+LVI VR2 SR6 VR7         # Load virtual parts of twiddle factors
+
+MULVV VR5 VR5 VR1
+DIVVS VR5 VR5 SR2
+MULVV VR6 VR6 VR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR3 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR3 VR3 VR5
+ADDVV VR3 VR3 VR6
+
+MTCL SR4
+UNPACKLO VR3 VR3 VR7    # Result of the real part of this iteration
+MTCL SR3
+
+MULVS VR5 VR5 SR2
+MULVS VR6 VR6 SR2
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
+
+MULVV VR5 VR5 VR2
+MULVV VR6 VR6 VR1
+DIVVS VR5 VR5 SR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR4 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR4 VR4 VR5
+ADDVV VR4 VR4 VR6
+
+MTCL SR4
+UNPACKLO VR4 VR4 VR7    # Result of the virtual part of this iteration
+
+# --------------- COMPUTATION COMPLETE FOR ODD HALF OF INPUT
+
+# VR3 -> REAL OF ODD HALF
+# VR4 -> VIRTUAL OF ODD HALF
+
+# VR1 -> REAL OF EVEN HALF
+# VR2 -> VIRTUAL OF EVEN HALF
+
+LV VR1 SR1
+ADD SR4 SR4 SR4
+LV VR2 SR4
+SUB SR4 SR4 SR3
+SUB SR4 SR4 SR3
+
+ADDVV VR7 VR3 VR0
+PACKLO VR3 VR1 VR7
+PACKHI VR5 VR1 VR7 
+
+ADDVV VR7 VR4 VR0
+PACKLO VR4 VR2 VR7
+PACKHI VR6 VR2 VR7
+
+LV VR1 SR5         # Load real part of twiddle factors
+LV VR2 SR6         # Load virtual parts of twiddle factors
+
+MULVV VR5 VR5 VR1
+DIVVS VR5 VR5 SR2
+MULVV VR6 VR6 VR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR3 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR3 VR3 VR5
+ADDVV VR3 VR3 VR6
+
+SLL SR3 SR1 SR1
+
+SVWS VR3 SR0 SR3    # The two stores result in the final output of real part 
+SVWS VR7 SR1 SR3
+
+MULVS VR5 VR5 SR2
+MULVS VR6 VR6 SR2
+DIVVV VR5 VR5 VR1
+DIVVV VR6 VR6 VR2
+
+MULVV VR5 VR5 VR2
+MULVV VR6 VR6 VR1
+DIVVS VR5 VR5 SR2
+DIVVS VR6 VR6 SR2
+
+SUBVV VR7 VR4 VR5
+SUBVV VR7 VR7 VR6
+
+ADDVV VR4 VR4 VR5
+ADDVV VR4 VR4 VR6
+SLL SR4 SR4 SR1
+SVWS VR4 SR4 SR3    # The two stores result in the final output of virtual part 
+ADD SR4 SR4 SR1
+SVWS VR7 SR4 SR3
 
 HALT

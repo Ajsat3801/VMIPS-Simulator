@@ -1234,7 +1234,6 @@ class Core_func():
         Function to decode the instruction and pass to subsequent execute function
         Inputs: instr_list : instruction in a list format
         """
-        #print(instr_list)
         instr_type = instr_list[0]
         ex_status = 0
 
