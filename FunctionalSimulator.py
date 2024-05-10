@@ -1055,7 +1055,7 @@ class Core_func():
         if SR1 == SR2:
             self.PC += IMM
         
-        self.IMEM.unrolled_instructions.append("B ("+str(self.PC+1)+")")
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC)+")")
         return 0
 
     def execute_BNE(self,instr_list):
@@ -1074,7 +1074,7 @@ class Core_func():
         if SR1 != SR2:
             self.PC += IMM
         
-        self.IMEM.unrolled_instructions.append("B ("+str(self.PC+1)+")")
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC)+")")
         return 0
         
     def execute_BGT(self,instr_list): 
@@ -1093,7 +1093,7 @@ class Core_func():
         if SR1 > SR2:
             self.PC += IMM
         
-        self.IMEM.unrolled_instructions.append("B ("+str(self.PC+1)+")")
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC)+")")
         return 0
         
     def execute_BLT(self,instr_list): 
@@ -1112,7 +1112,7 @@ class Core_func():
         if SR1 < SR2:
             self.PC += IMM
         
-        self.IMEM.unrolled_instructions.append("B ("+str(self.PC+1)+")")
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC)+")")
         return 0
         
     def execute_BGE(self,instr_list): 
@@ -1131,7 +1131,7 @@ class Core_func():
         if SR1 >= SR2:
             self.PC += IMM
         
-        self.IMEM.unrolled_instructions.append("B ("+str(self.PC+1)+")")
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC)+")")
         return 0
         
     def execute_BLE(self,instr_list): 
@@ -1150,7 +1150,7 @@ class Core_func():
         if SR1 <= SR2:
             self.PC += IMM
         
-        self.IMEM.unrolled_instructions.append("B ("+str(self.PC+1)+")")
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC)+")")
         return 0
 
     # Register - Register shuffle

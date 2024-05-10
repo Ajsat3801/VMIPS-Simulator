@@ -62,8 +62,8 @@ class instruction():
         self.smem_ad = []
         self.vmem_ad = []
         self.instr_cycleCount = 0
-        self.vectorLength = 0
-        self.vectorMask = [1]*64
+        self.vectorLength = 64
+        self.vectorMask = [1 for i in range(64)]
         self.computeResource = ""
 
 class Core():
@@ -71,10 +71,10 @@ class Core():
         self.IMEM = imem
         self.config = config
         self.PC = 0
-        self.VLR = 0
-        self.VMR = [1]*64
+        self.VLR = 64
+        self.VMR = [1 for i in range(64)]
        
-        self.busyBoard = {"scalar": [False]*8,"vector": [False]*8}
+        self.busyBoard = {"scalar": [False for i in range(8)],"vector": [False for i in range(8)]}
 
         self.queues = {"vectorCompute":[],
                        "vectorData":[],
@@ -93,7 +93,7 @@ class Core():
                                "Memory":[None,0],
                                "Scalar": [None, 0]
                               }
-        self.banks_busy = [[False,0]]*self.config.parameters["vdmNumBanks"]
+        self.banks_busy = [[False,0] for i in range(self.config.parameters["vdmNumBanks"])]
         
         self.nop = {"Fetch":False,"Decode":True,"SendToCompute":True}
                 
@@ -170,14 +170,14 @@ class Core():
             ins.instr_queue = 0
             ins.src_regs["Vector"] = [int(instr_list[1][2:]),int(instr_list[2][2:])]
             ins.vectorLength = self.VLR
-            self.VMR = instr_list[3][1:-1].split(",")
+            self.VMR = [int(ele) for ele in instr_list[3][1:-1].split(",")]
             ins.computeResource = "Adder"
 
         elif(ins.instr_name == "SVS"):
             ins.instr_queue = 0
             ins.src_regs["Vector"] = [int(instr_list[1][2:])]
             ins.src_regs["Scalar"] = [int(instr_list[2][2:])]
-            self.VMR = instr_list[3][1:-1].split(",")
+            self.VMR = [int(ele) for ele in instr_list[3][1:-1].split(",")]
             ins.computeResource = "Adder"
 
         elif(ins.instr_name in ["CVM"]):
@@ -198,14 +198,16 @@ class Core():
         elif(ins.instr_name in ["LV","LVI","LVWS",]):
             ins.instr_queue = 1
             ins.dst_regs["Vector"] = [int(instr_list[1][2:])]
-            ins.vmem_ad = instr_list[2][1:-1].split(",")
+            #ins.vmem_ad = instr_list[2][1:-1].split(",")
+            ins.vmem_ad = [int(ele) for ele in instr_list[2][1:-1].split(",")]
             ins.vectorLength = self.VLR
             ins.vectorMask = self.VMR
 
         elif(ins.instr_name in ['SV','SVI','SVWS']):
             ins.instr_queue = 1
             ins.src_regs["Vector"] = [int(instr_list[1][2:])]
-            ins.vmem_ad = instr_list[2][1:-1].split(",")
+            #ins.vmem_ad = instr_list[2][1:-1].split(",")
+            ins.vmem_ad = [int(ele) for ele in instr_list[2][1:-1].split(",")]
             ins.vectorLength = self.VLR
             ins.vectorMask = self.VMR
 
@@ -378,11 +380,15 @@ class Core():
         
         # calculate number of cycles to be taken in memory by simulating it
         # creating the queues for each lane:
-        vls_pipelines = [[]] * self.config.parameters["numLanes"]
+        
+        vls_pipelines = [[] for i in range(self.config.parameters["numLanes"])]
         # assigning each memory access to a queue
+
         for i in range(instr.vectorLength):
             if instr.vmem_ad[i] == -1: continue
-            else: vls_pipelines[i % self.config.parameters["numLanes"]].append(instr.vmem_ad[i])
+            else: 
+                index = instr.vmem_ad[i] % self.config.parameters["numLanes"]
+                vls_pipelines[index].append(instr.vmem_ad[i])
         
         # now we simulate all the memory accesses, and calculate the number of cycles to execute this instruction
         # to calculate which bank it should access, we mod the address by the number of banks
