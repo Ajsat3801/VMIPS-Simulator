@@ -1053,9 +1053,9 @@ class Core_func():
             return -1
         
         if SR1 == SR2:
-            self.PC += IMM
+            self.PC += IMM -1
         
-        self.IMEM.unrolled_instructions.append("B ("+str(self.PC)+")")
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC + 1)+")")
         return 0
 
     def execute_BNE(self,instr_list):
@@ -1072,9 +1072,9 @@ class Core_func():
             return -1
         
         if SR1 != SR2:
-            self.PC += IMM
+            self.PC += IMM -1
         
-        self.IMEM.unrolled_instructions.append("B ("+str(self.PC)+")")
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC + 1)+")")
         return 0
         
     def execute_BGT(self,instr_list): 
@@ -1091,9 +1091,9 @@ class Core_func():
             return -1
         
         if SR1 > SR2:
-            self.PC += IMM
+            self.PC += IMM -1
         
-        self.IMEM.unrolled_instructions.append("B ("+str(self.PC)+")")
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC + 1)+")")
         return 0
         
     def execute_BLT(self,instr_list): 
@@ -1110,9 +1110,9 @@ class Core_func():
             return -1
         
         if SR1 < SR2:
-            self.PC += IMM
+            self.PC += IMM -1
         
-        self.IMEM.unrolled_instructions.append("B ("+str(self.PC)+")")
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC + 1)+")")
         return 0
         
     def execute_BGE(self,instr_list): 
@@ -1129,9 +1129,9 @@ class Core_func():
             return -1
         
         if SR1 >= SR2:
-            self.PC += IMM
+            self.PC += IMM -1
         
-        self.IMEM.unrolled_instructions.append("B ("+str(self.PC)+")")
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC + 1)+")")
         return 0
         
     def execute_BLE(self,instr_list): 
@@ -1148,9 +1148,9 @@ class Core_func():
             return -1
         
         if SR1 <= SR2:
-            self.PC += IMM
+            self.PC += IMM -1
         
-        self.IMEM.unrolled_instructions.append("B ("+str(self.PC)+")")
+        self.IMEM.unrolled_instructions.append("B ("+str(self.PC + 1)+")")
         return 0
 
     # Register - Register shuffle
@@ -1311,7 +1311,6 @@ class Core_func():
             # break # Replace this line with your code.
             #read
             instr_list = self.IMEM.Read(self.PC)
-            #print(self.PC,instr_list)
 
             if instr_list:
                 if instr_list[0] == "HALT": 
