@@ -17,6 +17,21 @@ A vector has max length of 64 and each element is a 32-bit integer. There are 2 
 * **Register-Register Shuffle Operations:** `UNPACKLO`,`UNPACKHI`,`PACKLO`,`PACKHI`
 * **Halt:** `HALT`
 
+### Timing Simulator
+
+The architecture contains one instruction memory, one scalar data memory, one vector data memory, one busyboard and 5 processing units namely:
+* Vector Add/Sub Processsing Unit
+* Vector Mul Processing Unit
+* Vector Div Processing Unit
+* Vector Shuffle Processing Unit
+* Scalar Processing Unit
+
+
+The instructions fetched from instruction memory. After fetching, they are interpreted and checked for hazards using the busyboard. The Instructions are then sent to one of the three decoupled queues depending on the nature of the instructions. The number of cycles taken per instruction is then calculated depending on the parameters in the config file. 
+
+
+![Alt text](https://github.com/Ajsat3801/VMIPS-Simulator/blob/main/sim_arch.png "Architecture")
+
 # Test Programs
 ### Found in the input directory
 1. **Dot Product:**  Sum of the products of the corresponding entries of the two sequences of numbers. `MULVV`, `PACKLO`, `PACKHI` and `ADDVV` operations are used.
@@ -29,7 +44,9 @@ A vector has max length of 64 and each element is a 32-bit integer. There are 2 
 To perform the timing simulation, run driver.py file to generate the result.  
 To perform the design space analysis, run designSpaceAnalysis.py to generate the result.
 
-**Note: SDMEM.txt, VDMEM.txt, Code.asm, functionalSimulator.py and timingSimulator.py must be in the same directory as the driver.py file.**
+**Note:** 
+1. **SDMEM.txt, VDMEM.txt, Code.asm, functionalSimulator.py and timingSimulator.py must be in the same directory as the driver.py file.**
+2. **The timing simulator does not support branching. The output of the functionalSimulator.py is the input of the timingSimulator.py file**
 
 The instruction files and sample inputs for dot product, fully connected, convolution and fast fourier transforms are also given in the inputs directory. 
 To run the functions, the respective input files must be copied to the main directory.
